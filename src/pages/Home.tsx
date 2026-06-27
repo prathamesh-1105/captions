@@ -18,6 +18,11 @@ export default function Home({ onStart }: HomeProps) {
 
   // Fetch recent projects from Supabase on mount
   useEffect(() => {
+    if (!supabase) {
+      setError('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (.env file locally or Environment Variables on Vercel).');
+      return;
+    }
+
     async function fetchRecentProjects() {
       try {
         const { data, error: fetchError } = await supabase
@@ -92,6 +97,10 @@ export default function Home({ onStart }: HomeProps) {
 
     video.onloadedmetadata = async () => {
       try {
+        if (!supabase) {
+          throw new Error('Supabase client is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
+        }
+
         const metadata: VideoMetadata = {
           filename: videoFile.name,
           duration: video.duration || 10,

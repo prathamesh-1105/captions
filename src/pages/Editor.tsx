@@ -42,7 +42,7 @@ export default function Editor({
 
   // Debounced auto-save hook to Supabase database
   useEffect(() => {
-    if (!projectId) return;
+    if (!supabase || !projectId) return;
 
     setSaveStatus('saving');
     const delayDebounce = setTimeout(async () => {
