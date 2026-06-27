@@ -3,10 +3,5 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "dist",
-  "cleanUrls": true,
-  "env": {
-    "VITE_SUPABASE_URL": "https://aejxsfozuzrgnkewhpzf.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "sb_publishable_CJsM_uoZ66BHKC8SAk3AIA_2OhsX9Ek",
-    "VITE_API_URL": "http://localhost:5000"
-  }
+  "cleanUrls": true
 }
