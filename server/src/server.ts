@@ -1,12 +1,16 @@
 import express from 'express';
 import cors from 'cors';
-import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import dotenv from 'dotenv';
 import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { path as ffprobePath } from '@ffprobe-installer/ffprobe';
 import ffmpeg from 'fluent-ffmpeg';
-import { generateAssFile, CaptionBlock, CaptionStyle } from './utils/assGenerator';
+import { generateAssFile } from './utils/assGenerator';
+import { supabase } from './services/supabase';
+
+// Load environmental keys from root .env
+dotenv.config({ path: path.join(__dirname, '..', '..', '..', '.env') });
 
 // Set ffmpeg paths
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -20,102 +24,67 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Create necessary folders
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
-const TEMP_SUBS_DIR = path.join(__dirname, '..', 'temp_subs');
-const OUTPUTS_DIR = path.join(__dirname, '..', 'outputs');
+// Create necessary temp folders
+const TEMP_DIR = path.join(__dirname, '..', 'temp_workspace');
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
 
-[UPLOADS_DIR, TEMP_SUBS_DIR, OUTPUTS_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+// Helper: Download file from public URL to local disk
+async function downloadFile(url: string, destPath: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to download source video from Supabase Storage: ${res.statusText}`);
   }
-});
+  const arrayBuffer = await res.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  fs.writeFileSync(destPath, buffer);
+}
 
-// Configure Multer storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max video size
-});
-
-// Serve outputs statically for downloading
-app.use('/outputs', express.static(OUTPUTS_DIR));
-
-// Endpoint 1: Upload Video and probe metadata
-app.post('/api/upload', upload.single('video'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No video file provided.' });
-  }
-
-  const videoPath = req.file.path;
-  const filename = req.file.filename;
-
-  // Probe metadata
-  ffmpeg.ffprobe(videoPath, (err, metadata) => {
-    if (err) {
-      console.error('Error probing video:', err);
-      // Clean up uploaded file if probing fails
-      fs.unlinkSync(videoPath);
-      return res.status(500).json({ error: 'Failed to read video metadata.' });
-    }
-
-    const duration = metadata.format.duration || 0;
-    const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-    const width = videoStream?.width || 1920;
-    const height = videoStream?.height || 1080;
-
-    res.json({
-      success: true,
-      filename,
-      duration,
-      width,
-      height,
-      aspectRatio: width / height
-    });
-  });
-});
-
-// Endpoint 2: Export Video with burned subtitles
+// Endpoint 1: Export Video with burned subtitles from Supabase Database
 app.post('/api/export', async (req, res) => {
   const {
-    videoFilename,
-    captions,
-    style,
+    projectId,
     resolution = '1080p',
     fps = 30
   } = req.body as {
-    videoFilename: string;
-    captions: CaptionBlock[];
-    style: CaptionStyle;
+    projectId: string;
     resolution: '720p' | '1080p' | '2k' | '4k';
     fps: number;
   };
 
-  if (!videoFilename || !captions || !style) {
-    return res.status(400).json({ error: 'Missing required parameters.' });
+  if (!projectId) {
+    return res.status(400).json({ error: 'Missing required parameter: projectId.' });
   }
 
-  const inputVideoPath = path.join(UPLOADS_DIR, videoFilename);
-  if (!fs.existsSync(inputVideoPath)) {
-    return res.status(404).json({ error: 'Original video file not found.' });
+  // 1. Fetch project metadata from Supabase
+  const { data: project, error: dbError } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .single();
+
+  if (dbError || !project) {
+    console.error('Error fetching project from Supabase:', dbError);
+    return res.status(404).json({ error: `Project not found: ${dbError?.message || 'Invalid ID'}` });
   }
+
+  const {
+    name: videoName,
+    video_url: videoUrl,
+    video_filename: videoFilename,
+    captions,
+    style
+  } = project;
+
+  console.log(`Starting cloud export for Project: "${videoName}" (${projectId})`);
 
   const uniqueId = Date.now() + '-' + Math.round(Math.random() * 1e9);
-  const assFilename = `${uniqueId}.ass`;
-  const assPath = path.join(TEMP_SUBS_DIR, assFilename);
-  const outputFilename = `export-${uniqueId}.mp4`;
-  const outputPath = path.join(OUTPUTS_DIR, outputFilename);
+  const tempInputPath = path.join(TEMP_DIR, `input-${uniqueId}-${videoFilename}`);
+  const assPath = path.join(TEMP_DIR, `subs-${uniqueId}.ass`);
+  const tempOutputPath = path.join(TEMP_DIR, `output-${uniqueId}.mp4`);
 
-  // Map resolution settings to height
+  // Resolution heights
   const resolutionHeightMap = {
     '720p': 720,
     '1080p': 1080,
@@ -125,10 +94,15 @@ app.post('/api/export', async (req, res) => {
   const targetHeight = resolutionHeightMap[resolution] || 1080;
 
   try {
-    // 1. Get original video resolution to generate ASS with correct proportions
-    ffmpeg.ffprobe(inputVideoPath, (err, metadata) => {
-      if (err) {
-        return res.status(500).json({ error: 'Error reading video properties during export.' });
+    // 2. Download the original video from Supabase Storage
+    console.log(`Downloading source video from storage: ${videoUrl}`);
+    await downloadFile(videoUrl, tempInputPath);
+
+    // 3. Probe video properties to scale subtitle coordinates
+    ffmpeg.ffprobe(tempInputPath, async (probeErr, metadata) => {
+      if (probeErr) {
+        cleanupTempFiles([tempInputPath]);
+        return res.status(500).json({ error: 'Error probing downloaded video properties.' });
       }
 
       const videoStream = metadata.streams.find(s => s.codec_type === 'video');
@@ -137,101 +111,101 @@ app.post('/api/export', async (req, res) => {
       const aspectRatio = origWidth / origHeight;
       const targetWidth = Math.round(targetHeight * aspectRatio);
 
-      // 2. Generate and write ASS file
+      // 4. Generate and write ASS subtitles file
       const assContent = generateAssFile(captions, style, targetWidth, targetHeight);
       fs.writeFileSync(assPath, assContent, 'utf-8');
 
-      // 3. Escape path for FFmpeg subtitles filter on Windows
-      // Transform C:\path\to\subs.ass -> C\\:/path/to/subs.ass
+      // 5. Escape paths for FFmpeg subtitles filter on Windows
       const escapedAssPath = assPath.replace(/\\/g, '/').replace(/:/g, '\\\\:');
 
-      // 4. Run FFmpeg
-      console.log(`Starting FFmpeg export. Input: ${videoFilename}, Resolution: ${resolution}, FPS: ${fps}`);
-
-      // We chain scale and subtitles. Scale first so subtitles match the final size
+      // 6. Chain scale and subtitles filter
       const videoFilters = `scale=-2:${targetHeight},subtitles=${escapedAssPath}`;
 
-      ffmpeg(inputVideoPath)
+      console.log(`Running FFmpeg burn subtitles filter: ${resolution} @ ${fps}fps`);
+
+      ffmpeg(tempInputPath)
         .videoFilters(videoFilters)
         .videoCodec('libx264')
         .audioCodec('aac')
         .outputOptions([
           '-crf 20',          // High visual quality
-          '-preset medium',   // Balance encoding time vs compression
-          '-pix_fmt yuv420p', // Standard pixel format for web/mobile playback compatibility
-          `-r ${fps}`         // Frames per second
+          '-preset medium',   // Balance speed/efficiency
+          '-pix_fmt yuv420p', // Web/quicktime compatibility
+          `-r ${fps}`
         ])
-        .on('start', (commandLine) => {
-          console.log('FFmpeg command: ' + commandLine);
-        })
-        .on('progress', (progress) => {
-          console.log(`Export processing: ${progress.percent ? Math.round(progress.percent) : 0}% done`);
-        })
-        .on('end', () => {
-          console.log('FFmpeg processing completed successfully.');
+        .on('end', async () => {
+          console.log('FFmpeg processing completed. Uploading final video to Supabase Storage...');
 
-          // Clean up the temporary ASS subtitle file
           try {
-            if (fs.existsSync(assPath)) fs.unlinkSync(assPath);
-          } catch (cleanupErr) {
-            console.error('Error cleaning up ASS file:', cleanupErr);
-          }
+            // 7. Upload the compiled video back to Supabase 'exports' storage bucket
+            const outputBuffer = fs.readFileSync(tempOutputPath);
+            const exportFilename = `export-${uniqueId}.mp4`;
 
-          res.json({
-            success: true,
-            downloadUrl: `/outputs/${outputFilename}`,
-            filename: outputFilename
-          });
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('exports')
+              .upload(exportFilename, outputBuffer, {
+                contentType: 'video/mp4',
+                upsert: true
+              });
+
+            if (uploadError) {
+              throw new Error(`Failed to upload final export to storage bucket: ${uploadError.message}`);
+            }
+
+            // Get the public URL for download
+            const { data: { publicUrl } } = supabase.storage
+              .from('exports')
+              .getPublicUrl(exportFilename);
+
+            console.log(`Export uploaded successfully! Public URL: ${publicUrl}`);
+
+            // Clean up all local temporary workspace files
+            cleanupTempFiles([tempInputPath, assPath, tempOutputPath]);
+
+            // Return success with downloadUrl pointing directly to Supabase storage
+            res.json({
+              success: true,
+              downloadUrl: publicUrl,
+              filename: exportFilename
+            });
+          } catch (uploadErr: any) {
+            console.error('Error uploading output to Supabase Storage:', uploadErr);
+            cleanupTempFiles([tempInputPath, assPath, tempOutputPath]);
+            res.status(500).json({ error: uploadErr.message || 'Storage upload failed.' });
+          }
         })
         .on('error', (ffmpegErr) => {
-          console.error('FFmpeg encoding error:', ffmpegErr);
-
-          // Clean up files on error
-          try {
-            if (fs.existsSync(assPath)) fs.unlinkSync(assPath);
-            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
-          } catch (cleanupErr) {
-            console.error('Cleanup error on FFmpeg failure:', cleanupErr);
-          }
-
-          res.status(500).json({ error: 'FFmpeg processing failed: ' + ffmpegErr.message });
+          console.error('FFmpeg processing error:', ffmpegErr);
+          cleanupTempFiles([tempInputPath, assPath, tempOutputPath]);
+          res.status(500).json({ error: 'FFmpeg encoding failed: ' + ffmpegErr.message });
         })
-        .save(outputPath);
+        .save(tempOutputPath);
     });
   } catch (err: any) {
-    console.error('Export handling error:', err);
-    res.status(500).json({ error: err.message || 'Server error occurred during export.' });
+    console.error('Export error: ', err);
+    cleanupTempFiles([tempInputPath, assPath, tempOutputPath]);
+    res.status(500).json({ error: err.message || 'Server error occurred during export processing.' });
   }
 });
 
-// Endpoint 3: Check export status / simple ping
+// Helper: Delete files synchronously if they exist
+function cleanupTempFiles(filePaths: string[]) {
+  filePaths.forEach(filePath => {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error(`Failed to delete temp file: ${filePath}`, err);
+    }
+  });
+}
+
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date() });
 });
 
-// Periodic cleanup task: delete uploads and outputs older than 1 hour
-setInterval(() => {
-  const ONE_HOUR = 60 * 60 * 1000;
-  const now = Date.now();
-
-  [UPLOADS_DIR, OUTPUTS_DIR, TEMP_SUBS_DIR].forEach(dir => {
-    fs.readdir(dir, (err, files) => {
-      if (err) return;
-      files.forEach(file => {
-        const filePath = path.join(dir, file);
-        fs.stat(filePath, (statErr, stats) => {
-          if (statErr) return;
-          if (now - stats.mtimeMs > ONE_HOUR) {
-            fs.unlink(filePath, () => {
-              console.log(`Auto-cleaned old file: ${file}`);
-            });
-          }
-        });
-      });
-    });
-  });
-}, 10 * 60 * 1000); // Run every 10 minutes
-
 app.listen(PORT, () => {
-  console.log(`CaptionFlow AI server running on http://localhost:${PORT}`);
+  console.log(`CaptionFlow AI stateless server running on http://localhost:${PORT}`);
 });

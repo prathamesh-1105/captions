@@ -9,6 +9,7 @@ type Page = 'home' | 'editor' | 'export';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [captions, setCaptions] = useState<CaptionBlock[]>([]);
@@ -22,9 +23,10 @@ export default function App() {
 
   // Transition back to upload home
   const handleReset = () => {
-    if (videoMetadata?.blobUrl) {
+    if (videoMetadata?.blobUrl && videoFile) {
       URL.revokeObjectURL(videoMetadata.blobUrl);
     }
+    setProjectId(null);
     setVideoFile(null);
     setVideoMetadata(null);
     setCaptions([]);
@@ -32,7 +34,8 @@ export default function App() {
     setCurrentPage('home');
   };
 
-  const startEditing = (file: File, metadata: VideoMetadata, initialCaptions: CaptionBlock[]) => {
+  const startEditing = (file: File | null, metadata: VideoMetadata, initialCaptions: CaptionBlock[], id?: string) => {
+    setProjectId(id || null);
     setVideoFile(file);
     setVideoMetadata(metadata);
     setCaptions(initialCaptions);
@@ -72,8 +75,9 @@ export default function App() {
         {currentPage === 'home' && (
           <Home onStart={startEditing} />
         )}
-        {currentPage === 'editor' && videoMetadata && videoFile && (
+        {currentPage === 'editor' && videoMetadata && (
           <Editor
+            projectId={projectId}
             videoFile={videoFile}
             metadata={videoMetadata}
             captions={captions}
@@ -87,12 +91,10 @@ export default function App() {
             onExport={() => setCurrentPage('export')}
           />
         )}
-        {currentPage === 'export' && videoMetadata && videoFile && (
+        {currentPage === 'export' && videoMetadata && (
           <Export
-            videoFile={videoFile}
+            projectId={projectId}
             metadata={videoMetadata}
-            captions={captions}
-            style={style}
             resolution={resolution}
             fps={fps}
             onBack={() => setCurrentPage('editor')}

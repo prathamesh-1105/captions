@@ -4,9 +4,11 @@ import VideoPlayer from '../components/VideoPlayer';
 import Timeline from '../components/Timeline';
 import StyleCustomizer from '../components/StyleCustomizer';
 import PresetList from '../components/PresetList';
+import { supabase } from '../services/supabase';
 
 interface EditorProps {
-  videoFile: File;
+  projectId: string | null;
+  videoFile: File | null;
   metadata: VideoMetadata;
   captions: CaptionBlock[];
   setCaptions: React.Dispatch<React.SetStateAction<CaptionBlock[]>>;
@@ -20,6 +22,7 @@ interface EditorProps {
 }
 
 export default function Editor({
+  projectId,
   metadata,
   captions,
   setCaptions,
@@ -35,6 +38,37 @@ export default function Editor({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(50); // pixels per second
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>('saved');
+
+  // Debounced auto-save hook to Supabase database
+  useEffect(() => {
+    if (!projectId) return;
+
+    setSaveStatus('saving');
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .update({
+            captions,
+            style
+          })
+          .eq('id', projectId);
+
+        if (error) {
+          console.error('Error auto-saving:', error);
+          setSaveStatus('error');
+        } else {
+          setSaveStatus('saved');
+        }
+      } catch (err) {
+        console.error('Auto-save network error:', err);
+        setSaveStatus('error');
+      }
+    }, 1500); // 1.5 second debounce
+
+    return () => clearTimeout(delayDebounce);
+  }, [captions, style, projectId]);
 
   // History stack for Undo/Redo
   const [history, setHistory] = useState<CaptionBlock[][]>([captions]);
@@ -168,12 +202,31 @@ export default function Editor({
         <div className="flex-1 flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40">
           {/* Action Toolbar */}
           <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
-            <div className="flex items-center gap-3 text-xs text-zinc-400">
+            <div className="flex items-center gap-3 text-xs text-zinc-450">
               <span className="font-semibold text-zinc-200">Timeline Editor</span>
               <span>•</span>
               <span className="truncate max-w-[200px]">{metadata.filename}</span>
               <span>•</span>
               <span>{captions.length} phrases</span>
+              <span>•</span>
+              {saveStatus === 'saving' && (
+                <span className="flex items-center gap-1.5 text-zinc-400 font-medium select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
+                  Saving edits...
+                </span>
+              )}
+              {saveStatus === 'saved' && (
+                <span className="flex items-center gap-1.5 text-zinc-550 font-medium select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Saved to database
+                </span>
+              )}
+              {saveStatus === 'error' && (
+                <span className="flex items-center gap-1.5 text-red-400 font-semibold select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  Auto-save failed
+                </span>
+              )}
             </div>
 
             {/* Undo / Redo controls */}

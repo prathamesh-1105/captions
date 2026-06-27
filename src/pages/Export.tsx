@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react';
-import type { CaptionBlock, CaptionStyle, VideoMetadata } from '../types';
+import type { VideoMetadata } from '../types';
 
 interface ExportProps {
-  videoFile: File;
+  projectId: string | null;
   metadata: VideoMetadata;
-  captions: CaptionBlock[];
-  style: CaptionStyle;
   resolution: '720p' | '1080p' | '2k' | '4k';
   fps: number;
   onBack: () => void;
   onRestart: () => void;
 }
 
-type ExportState = 'idle' | 'uploading' | 'processing' | 'completed' | 'failed';
+type ExportState = 'idle' | 'processing' | 'completed' | 'failed';
 
 export default function Export({
-  videoFile,
-  captions,
-  style,
+  projectId,
   resolution,
   fps,
   onBack,
@@ -25,7 +21,6 @@ export default function Export({
 }: ExportProps) {
   const API_BASE = import.meta.env.VITE_API_URL || '';
   const [status, setStatus] = useState<ExportState>('idle');
-  const [uploadPercent, setUploadPercent] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [downloadUrl, setDownloadUrl] = useState<string>('');
 
@@ -35,59 +30,24 @@ export default function Export({
   }, []);
 
   const startExportProcess = () => {
-    setStatus('uploading');
-    setUploadPercent(0);
     setErrorMessage('');
-
-    // 1. Upload Video File using XMLHttpRequest for native progress events
-    const formData = new FormData();
-    formData.append('video', videoFile);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${API_BASE}/api/upload`);
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setUploadPercent(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const response = JSON.parse(xhr.responseText);
-          if (response.success && response.filename) {
-            // Video uploaded successfully, now request FFmpeg compilation
-            triggerServerRender(response.filename);
-          } else {
-            handleError('Failed to retrieve filename from server upload.');
-          }
-        } catch (err) {
-          handleError('Error parsing server upload response.');
-        }
-      } else {
-        handleError(`Upload failed with status ${xhr.status}`);
-      }
-    };
-
-    xhr.onerror = () => {
-      handleError('Network error occurred during video upload.');
-    };
-
-    xhr.send(formData);
+    
+    if (projectId) {
+      // Trigger backend compilation directly using the cloud project
+      triggerServerRender(projectId);
+    } else {
+      handleError('No active Supabase project found to export.');
+    }
   };
 
-  const triggerServerRender = async (filename: string) => {
+  const triggerServerRender = async (id: string) => {
     setStatus('processing');
     try {
       const response = await fetch(`${API_BASE}/api/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          videoFilename: filename,
-          captions,
-          style,
+          projectId: id,
           resolution,
           fps
         })
@@ -124,33 +84,6 @@ export default function Export({
           <p className="text-xs text-zinc-400 mt-1">Resolution: {resolution} • {fps} FPS</p>
         </div>
 
-        {/* Uploading Phase */}
-        {status === 'uploading' && (
-          <div className="space-y-4 py-4">
-            <div className="w-16 h-16 rounded-full bg-violet-500/10 text-violet-400 flex items-center justify-center mx-auto animate-pulse">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-              </svg>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-zinc-200">Uploading Video File</p>
-              <p className="text-xs text-zinc-500">Do not close this page during upload</p>
-            </div>
-            {/* Progress Bar */}
-            <div className="space-y-1">
-              <div className="h-2 w-full bg-zinc-900 rounded-full overflow-hidden border border-white/5">
-                <div
-                  className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all duration-300 rounded-full"
-                  style={{ width: `${uploadPercent}%` }}
-                />
-              </div>
-              <div className="flex justify-end text-[10px] text-zinc-500 font-mono">
-                {uploadPercent}%
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Processing Phase */}
         {status === 'processing' && (
           <div className="space-y-4 py-4">
@@ -162,7 +95,7 @@ export default function Export({
             </div>
             <div className="space-y-2">
               <p className="text-sm font-semibold text-zinc-200">Burning Captions onto Video</p>
-              <p className="text-xs text-zinc-500">FFmpeg is encoding and scaling subtitles. Please wait.</p>
+              <p className="text-xs text-zinc-550">FFmpeg is downloading the video from Supabase, applying subtitle presets, and encoding overlays. Please wait.</p>
             </div>
           </div>
         )}
@@ -177,7 +110,7 @@ export default function Export({
             </div>
             <div className="space-y-1">
               <p className="text-base font-bold text-zinc-100">Export Complete!</p>
-              <p className="text-xs text-zinc-550">Your high-quality MP4 video with styled captions is ready.</p>
+              <p className="text-xs text-zinc-550">Your high-quality MP4 video with styled captions has been uploaded back to Supabase Storage.</p>
             </div>
 
             <a
@@ -200,7 +133,7 @@ export default function Export({
             </div>
             <div className="space-y-1.5">
               <p className="text-sm font-semibold text-red-200">Export Failed</p>
-              <p className="text-xs text-zinc-500 max-w-[280px] mx-auto leading-relaxed">{errorMessage}</p>
+              <p className="text-xs text-zinc-550 max-w-[280px] mx-auto leading-relaxed">{errorMessage}</p>
             </div>
             <button
               onClick={startExportProcess}
@@ -215,7 +148,7 @@ export default function Export({
         <div className="flex items-center gap-3 pt-4 border-t border-white/5">
           <button
             onClick={onBack}
-            disabled={status === 'uploading' || status === 'processing'}
+            disabled={status === 'processing'}
             className="flex-1 py-2 rounded-xl bg-zinc-900 border border-white/10 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-850 disabled:opacity-30 disabled:pointer-events-none transition-colors"
           >
             Back to Editor
