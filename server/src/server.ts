@@ -146,7 +146,16 @@ app.get('/api/projects', async (req, res) => {
       .limit(6);
 
     if (error) throw error;
-    res.json(data || []);
+
+    // Map projects to dynamically compute aspect_ratio and fallback resolution/fps
+    const mapped = (data || []).map((p: any) => ({
+      ...p,
+      aspect_ratio: p.aspect_ratio || (p.width && p.height ? p.width / p.height : 16/9),
+      resolution: p.resolution || '1080p',
+      fps: p.fps || 30
+    }));
+
+    res.json(mapped);
   } catch (err: any) {
     console.error('Failed to get projects:', err);
     res.status(500).json({ error: err.message || 'Failed to fetch projects.' });
@@ -157,6 +166,18 @@ app.get('/api/projects', async (req, res) => {
 app.post('/api/projects', async (req, res) => {
   try {
     const projectData = req.body;
+
+    // Extract only the core columns that are guaranteed to exist in the database table
+    const corePayload = {
+      name: projectData.name,
+      video_url: projectData.video_url,
+      video_filename: projectData.video_filename,
+      duration: projectData.duration,
+      width: projectData.width,
+      height: projectData.height,
+      captions: projectData.captions,
+      style: projectData.style
+    };
     
     if (projectData.id) {
       // Update existing project
@@ -164,17 +185,7 @@ app.post('/api/projects', async (req, res) => {
       const { data, error } = await supabase
         .from('projects')
         .update({
-          name: projectData.name,
-          video_url: projectData.video_url,
-          video_filename: projectData.video_filename,
-          duration: projectData.duration,
-          width: projectData.width,
-          height: projectData.height,
-          aspect_ratio: projectData.aspect_ratio,
-          captions: projectData.captions,
-          style: projectData.style,
-          resolution: projectData.resolution,
-          fps: projectData.fps,
+          ...corePayload,
           updated_at: new Date()
         })
         .eq('id', projectData.id)
@@ -182,18 +193,32 @@ app.post('/api/projects', async (req, res) => {
         .single();
 
       if (error) throw error;
-      res.json(data);
+
+      const mapped = {
+        ...data,
+        aspect_ratio: data.aspect_ratio || (data.width && data.height ? data.width / data.height : 16/9),
+        resolution: data.resolution || '1080p',
+        fps: data.fps || 30
+      };
+      res.json(mapped);
     } else {
       // Insert new project
       console.log(`Bypassing RLS: Inserting new project: "${projectData.name}"`);
       const { data, error } = await supabase
         .from('projects')
-        .insert(projectData)
+        .insert(corePayload)
         .select()
         .single();
 
       if (error) throw error;
-      res.json(data);
+
+      const mapped = {
+        ...data,
+        aspect_ratio: data.aspect_ratio || (data.width && data.height ? data.width / data.height : 16/9),
+        resolution: data.resolution || '1080p',
+        fps: data.fps || 30
+      };
+      res.json(mapped);
     }
   } catch (err: any) {
     console.error('Failed to save project:', err);
