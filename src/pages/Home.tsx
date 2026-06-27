@@ -21,14 +21,18 @@ export default function Home({ onStart }: HomeProps) {
     async function fetchRecentProjects() {
       try {
         const response = await fetch(`${API_BASE}/api/projects`);
-        if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        
+        if (response.ok && contentType.includes('application/json')) {
           const data = await response.json();
           setRecentProjects(data || []);
         } else {
-          console.error('Failed to retrieve recent projects from backend.');
+          console.error('Failed to retrieve recent projects from backend: Non-JSON response.');
+          setError(`Connection error: Received HTML page instead of JSON data. Fetch URL was: ${API_BASE}/api/projects. (Is your local server running on port 5000?)`);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to connect to backend server:', err);
+        setError(`Failed to connect to rendering backend: ${err.message}. Fetch URL: ${API_BASE}/api/projects`);
       }
     }
     fetchRecentProjects();
