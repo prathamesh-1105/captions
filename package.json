@@ -1,13 +1,33 @@
 {
-  "name": "captionflow-ai-root",
-  "version": "1.0.0",
+  "name": "captionflow-ai",
   "private": true,
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "setup": "npm install && npm install --prefix server && npm install --prefix client",
-    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
-    "start": "concurrently \"npm run dev --prefix client\" \"npm start --prefix server\""
+    "dev": "concurrently \"vite\" \"npm run dev --prefix server\"",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "server": "npm run dev --prefix server",
+    "setup": "npm install && npm install --prefix server"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.1",
+    "framer-motion": "^12.42.0",
+    "lucide-react": "^1.21.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-dropzone": "^15.0.0",
+    "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^8.2.2",
+    "oxlint": "^1.69.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0"
   }
 }
