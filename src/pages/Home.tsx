@@ -356,7 +356,7 @@ Looking for a place to hide
                         {project.name}
                       </p>
                       <p className="text-[10px] text-zinc-500 mt-1">
-                        Duration: {project.duration.toFixed(1)}s • {project.captions?.length || 0} subtitles
+                        Duration: {(Number(project.duration) || 0).toFixed(1)}s • {project.captions?.length || 0} subtitles
                       </p>
                     </div>
 
