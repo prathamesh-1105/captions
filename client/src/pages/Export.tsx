@@ -23,6 +23,7 @@ export default function Export({
   onBack,
   onRestart
 }: ExportProps) {
+  const API_BASE = import.meta.env.VITE_API_URL || '';
   const [status, setStatus] = useState<ExportState>('idle');
   const [uploadPercent, setUploadPercent] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -43,7 +44,7 @@ export default function Export({
     formData.append('video', videoFile);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
+    xhr.open('POST', `${API_BASE}/api/upload`);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -80,7 +81,7 @@ export default function Export({
   const triggerServerRender = async (filename: string) => {
     setStatus('processing');
     try {
-      const response = await fetch('/api/export', {
+      const response = await fetch(`${API_BASE}/api/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,7 +181,7 @@ export default function Export({
             </div>
 
             <a
-              href={downloadUrl}
+              href={downloadUrl.startsWith('http') ? downloadUrl : `${API_BASE}${downloadUrl}`}
               download
               className="block w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-sm font-semibold rounded-xl hover:from-emerald-400 hover:to-teal-400 shadow-lg shadow-emerald-500/20 text-white transition-all duration-300"
             >
