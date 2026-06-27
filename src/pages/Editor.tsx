@@ -4,7 +4,6 @@ import VideoPlayer from '../components/VideoPlayer';
 import Timeline from '../components/Timeline';
 import StyleCustomizer from '../components/StyleCustomizer';
 import PresetList from '../components/PresetList';
-import { supabase } from '../services/supabase';
 
 interface EditorProps {
   projectId: string | null;
@@ -39,27 +38,30 @@ export default function Editor({
   const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(50); // pixels per second
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>('saved');
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
-  // Debounced auto-save hook to Supabase database
+  // Debounced auto-save hook to backend projects API
   useEffect(() => {
-    if (!supabase || !projectId) return;
+    if (!projectId) return;
 
     setSaveStatus('saving');
     const delayDebounce = setTimeout(async () => {
       try {
-        const { error } = await supabase
-          .from('projects')
-          .update({
+        const response = await fetch(`${API_BASE}/api/projects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: projectId,
             captions,
             style
           })
-          .eq('id', projectId);
+        });
 
-        if (error) {
-          console.error('Error auto-saving:', error);
-          setSaveStatus('error');
-        } else {
+        if (response.ok) {
           setSaveStatus('saved');
+        } else {
+          console.error('Error auto-saving to backend.');
+          setSaveStatus('error');
         }
       } catch (err) {
         console.error('Auto-save network error:', err);

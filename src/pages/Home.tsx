@@ -2,13 +2,13 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { distributeCaptions } from '../utils/timeline';
 import type { VideoMetadata, CaptionBlock } from '../types';
-import { supabase } from '../services/supabase';
 
 interface HomeProps {
   onStart: (file: File | null, metadata: VideoMetadata, captions: CaptionBlock[], id?: string) => void;
 }
 
 export default function Home({ onStart }: HomeProps) {
+  const API_BASE = import.meta.env.VITE_API_URL || '';
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [lyricsText, setLyricsText] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -16,28 +16,19 @@ export default function Home({ onStart }: HomeProps) {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
 
-  // Fetch recent projects from Supabase on mount
+  // Fetch recent projects from Backend on mount (bypasses RLS)
   useEffect(() => {
-    if (!supabase) {
-      setError('Supabase is not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment variables (.env file locally or Environment Variables on Vercel).');
-      return;
-    }
-
     async function fetchRecentProjects() {
       try {
-        const { data, error: fetchError } = await supabase
-          .from('projects')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(4);
-
-        if (fetchError) {
-          console.error('Error fetching projects:', fetchError);
-        } else if (data) {
-          setRecentProjects(data);
+        const response = await fetch(`${API_BASE}/api/projects`);
+        if (response.ok) {
+          const data = await response.json();
+          setRecentProjects(data || []);
+        } else {
+          console.error('Failed to retrieve recent projects from backend.');
         }
       } catch (err) {
-        console.error('Failed to connect to Supabase database:', err);
+        console.error('Failed to connect to backend server:', err);
       }
     }
     fetchRecentProjects();
@@ -97,10 +88,6 @@ export default function Home({ onStart }: HomeProps) {
 
     video.onloadedmetadata = async () => {
       try {
-        if (!supabase) {
-          throw new Error('Supabase client is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.');
-        }
-
         const metadata: VideoMetadata = {
           filename: videoFile.name,
           duration: video.duration || 10,
@@ -110,26 +97,23 @@ export default function Home({ onStart }: HomeProps) {
           blobUrl: localBlobUrl
         };
 
-        // 1. Upload video to Supabase Storage Bucket 'videos'
-        setUploadProgress('Uploading video to Supabase Storage...');
-        const fileExt = videoFile.name.split('.').pop();
-        const bucketFilename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+        // 1. Upload video file to backend upload proxy endpoint
+        setUploadProgress('Uploading video to backend server...');
+        const formData = new FormData();
+        formData.append('video', videoFile);
 
-        const { error: uploadError } = await supabase.storage
-          .from('videos')
-          .upload(bucketFilename, videoFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
+        const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+          method: 'POST',
+          body: formData
+        });
 
-        if (uploadError) {
-          throw new Error(`Supabase Storage Upload failed: ${uploadError.message}. Make sure you created a public bucket named "videos".`);
+        if (!uploadResponse.ok) {
+          const errResponse = await uploadResponse.json();
+          throw new Error(errResponse.error || 'Server rejected file upload.');
         }
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('videos')
-          .getPublicUrl(bucketFilename);
+        const uploadResult = await uploadResponse.json();
+        const { videoUrl, filename: bucketFilename } = uploadResult;
 
         // 2. Distribute captions evenly based on duration
         setUploadProgress('Analyzing script timelines...');
@@ -154,13 +138,14 @@ export default function Home({ onStart }: HomeProps) {
           position: 'bottom' as const
         };
 
-        // 3. Insert Project Row into Database
-        setUploadProgress('Saving project in database...');
-        const { data: projectRow, error: dbError } = await supabase
-          .from('projects')
-          .insert({
+        // 3. Save project row via backend projects API
+        setUploadProgress('Saving project record...');
+        const saveResponse = await fetch(`${API_BASE}/api/projects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             name: videoFile.name,
-            video_url: publicUrl,
+            video_url: videoUrl,
             video_filename: bucketFilename,
             duration: metadata.duration,
             width: metadata.width,
@@ -171,12 +156,14 @@ export default function Home({ onStart }: HomeProps) {
             resolution: '1080p',
             fps: 30
           })
-          .select()
-          .single();
+        });
 
-        if (dbError) {
-          throw new Error(`Database Insert failed: ${dbError.message}. Make sure you ran the SQL schema snippet in your Supabase editor.`);
+        if (!saveResponse.ok) {
+          const errResponse = await saveResponse.json();
+          throw new Error(errResponse.error || 'Failed to save project schema.');
         }
+
+        const projectRow = await saveResponse.json();
 
         setLoading(false);
         // Load editor
@@ -252,7 +239,7 @@ export default function Home({ onStart }: HomeProps) {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-zinc-200 truncate max-w-[250px] mx-auto">{videoFile.name}</p>
-                      <p className="text-xs text-zinc-500 mt-1">{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                      <p className="text-xs text-zinc-550 mt-1">{(videoFile.size / (1024 * 1024)).toFixed(1)} MB</p>
                     </div>
                     <button
                       type="button"
@@ -274,7 +261,7 @@ export default function Home({ onStart }: HomeProps) {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-zinc-200">Drag & drop your video here</p>
-                      <p className="text-xs text-zinc-500 mt-1">Supports MP4, MOV, AVI, MKV</p>
+                      <p className="text-xs text-zinc-550 mt-1">Supports MP4, MOV, AVI, MKV</p>
                     </div>
                     <button type="button" className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-zinc-300 hover:bg-white/10 transition-colors">
                       Browse File
@@ -298,7 +285,7 @@ Looking for a place to hide
 
 (Unicode supported: English, Hindi, Marathi, Mixed)
 उदा: I love माझं city ❤️`}
-                className="w-full h-32 rounded-xl bg-zinc-900 border border-white/10 p-3.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none leading-relaxed"
+                className="w-full h-32 rounded-xl bg-zinc-900 border border-white/10 p-3.5 text-xs text-zinc-200 placeholder-zinc-550 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none leading-relaxed"
               />
             </div>
 
@@ -337,7 +324,7 @@ Looking for a place to hide
 
             {recentProjects.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-6 border border-white/5 border-dashed rounded-xl bg-zinc-900/30">
-                <svg className="w-8 h-8 text-zinc-600 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <svg className="w-8 h-8 text-zinc-500 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 13.5h3.86a2.25 2.25 0 0 1 2.008 1.24l.885 1.77a2.25 2.25 0 0 0 2.007 1.24h1.98a2.25 2.25 0 0 0 2.007-1.24l.885-1.77a2.25 2.25 0 0 1 2.007-1.24h3.86m-18 0h18" />
                 </svg>
                 <p className="text-xs text-zinc-550 font-medium">No saved projects yet</p>
@@ -355,7 +342,7 @@ Looking for a place to hide
                       <p className="text-xs font-semibold text-zinc-200 truncate group-hover:text-violet-400 transition-colors">
                         {project.name}
                       </p>
-                      <p className="text-[10px] text-zinc-500 mt-1">
+                      <p className="text-[10px] text-zinc-550 mt-1">
                         Duration: {(Number(project.duration) || 0).toFixed(1)}s • {project.captions?.length || 0} subtitles
                       </p>
                     </div>

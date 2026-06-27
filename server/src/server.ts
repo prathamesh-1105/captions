@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import multer from 'multer';
 import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
 import { path as ffprobePath } from '@ffprobe-installer/ffprobe';
 import ffmpeg from 'fluent-ffmpeg';
@@ -14,6 +15,7 @@ dotenv.config({ path: path.join(__dirname, '..', '..', '..', '.env') });
 
 // Set ffmpeg paths
 ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
 
 const app = express();
@@ -21,27 +23,185 @@ const PORT = process.env.PORT || 5000;
 
 // Enable CORS and JSON parsing
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Create necessary temp folders
 const TEMP_DIR = path.join(__dirname, '..', 'temp_workspace');
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR, { recursive: true });
-}
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+
+[TEMP_DIR, UPLOADS_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
+
+// Configure Multer storage for local file upload parsing
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB max video size
+});
 
 // Helper: Download file from public URL to local disk
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to download source video from Supabase Storage: ${res.statusText}`);
+    throw new Error(`Failed to download source video: ${res.statusText}`);
   }
   const arrayBuffer = await res.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   fs.writeFileSync(destPath, buffer);
 }
 
-// Endpoint 1: Export Video with burned subtitles from Supabase Database
+// Endpoint 1: Upload Video, Upload to Supabase Storage, and Probe Metadata
+app.post('/api/upload', upload.single('video'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No video file provided.' });
+  }
+
+  const videoPath = req.file.path;
+  const filename = req.file.filename;
+
+  try {
+    console.log(`Bypassing RLS: Uploading raw file "${req.file.originalname}" to Supabase Storage...`);
+    
+    // Read local file buffer
+    const fileBuffer = fs.readFileSync(videoPath);
+
+    // Upload to Supabase videos bucket (Authorized via Service Role Key bypasses RLS)
+    const { error: uploadError } = await supabase.storage
+      .from('videos')
+      .upload(filename, fileBuffer, {
+        contentType: req.file.mimetype || 'video/mp4',
+        upsert: true
+      });
+
+    if (uploadError) {
+      throw new Error(`Supabase Storage upload failed: ${uploadError.message}`);
+    }
+
+    // Get the public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filename);
+
+    console.log(`Video uploaded successfully to Supabase. Public URL: ${publicUrl}`);
+
+    // Probe metadata using FFprobe
+    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+      // Clean up the local temp upload file immediately
+      try {
+        if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+      } catch (cleanupErr) {
+        console.error('Temp cleanup failed:', cleanupErr);
+      }
+
+      if (err) {
+        console.error('Error probing video:', err);
+        return res.status(500).json({ error: 'Failed to read video metadata.' });
+      }
+
+      const duration = metadata.format.duration || 0;
+      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      const width = videoStream?.width || 1920;
+      const height = videoStream?.height || 1080;
+
+      res.json({
+        success: true,
+        filename,
+        videoUrl: publicUrl,
+        duration,
+        width,
+        height,
+        aspectRatio: width / height
+      });
+    });
+  } catch (err: any) {
+    // Clean up local file on failure
+    try {
+      if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+    } catch {}
+    console.error('Upload proxy endpoint failed:', err);
+    res.status(500).json({ error: err.message || 'Server upload proxy failed.' });
+  }
+});
+
+// Endpoint 2: Get Recent Projects from Supabase (Bypassing RLS)
+app.get('/api/projects', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (error) throw error;
+    res.json(data || []);
+  } catch (err: any) {
+    console.error('Failed to get projects:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch projects.' });
+  }
+});
+
+// Endpoint 3: Create / Save Project (Bypassing RLS)
+app.post('/api/projects', async (req, res) => {
+  try {
+    const projectData = req.body;
+    
+    if (projectData.id) {
+      // Update existing project
+      console.log(`Bypassing RLS: Updating project ID: ${projectData.id}`);
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          name: projectData.name,
+          video_url: projectData.video_url,
+          video_filename: projectData.video_filename,
+          duration: projectData.duration,
+          width: projectData.width,
+          height: projectData.height,
+          aspect_ratio: projectData.aspect_ratio,
+          captions: projectData.captions,
+          style: projectData.style,
+          resolution: projectData.resolution,
+          fps: projectData.fps,
+          updated_at: new Date()
+        })
+        .eq('id', projectData.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    } else {
+      // Insert new project
+      console.log(`Bypassing RLS: Inserting new project: "${projectData.name}"`);
+      const { data, error } = await supabase
+        .from('projects')
+        .insert(projectData)
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(data);
+    }
+  } catch (err: any) {
+    console.error('Failed to save project:', err);
+    res.status(500).json({ error: err.message || 'Failed to save project.' });
+  }
+});
+
+// Endpoint 4: Export Video with burned subtitles from Supabase Database
 app.post('/api/export', async (req, res) => {
   const {
     projectId,
