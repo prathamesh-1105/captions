@@ -38,7 +38,7 @@ export default function Editor({
   const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(50); // pixels per second
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>('saved');
-  const API_BASE = import.meta.env.VITE_API_URL || '';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   // Debounced auto-save hook to backend projects API
   useEffect(() => {
