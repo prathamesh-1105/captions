@@ -1,0 +1,13 @@
+{
+  "name": "captionflow-ai-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "npm install && npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
+    "start": "concurrently \"npm run dev --prefix client\" \"npm start --prefix server\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

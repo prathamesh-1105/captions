@@ -1,0 +1,21 @@
+# Node dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production builds
+client/dist/
+server/dist/
+
+# Server temporary files
+server/uploads/
+server/outputs/
+server/temp_subs/
+
+# Environment variables
+.env
+.env.local
+
+# Operating System files
+.DS_Store
+Thumbs.db
