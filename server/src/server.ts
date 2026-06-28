@@ -137,6 +137,53 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 });
 
 // Endpoint 2: Get Recent Projects from Supabase (Bypassing RLS)
+// Helper: Map Supabase database row to frontend project object
+const mapProjectFromDb = (p: any) => {
+  let captions: any[] = [];
+  let style: any = {};
+
+  try {
+    if (p.lyrics_text) {
+      const parsed = JSON.parse(p.lyrics_text);
+      captions = parsed.captions || [];
+      style = parsed.style || {};
+    }
+  } catch (err) {
+    console.warn(`Failed to parse lyrics_text JSON for project ${p.id}, falling back.`);
+  }
+
+  return {
+    id: String(p.id),
+    name: p.name || 'Untitled Project',
+    video_url: p.video_path || '',
+    video_filename: p.video_filename || '',
+    duration: Number(p.video_duration) || 0,
+    width: Number(p.video_width) || 1920,
+    height: Number(p.video_height) || 1080,
+    aspect_ratio: p.video_width && p.video_height ? p.video_width / p.video_height : 16 / 9,
+    captions,
+    style: Object.keys(style).length ? style : {
+      fontFamily: 'Arial',
+      fontSize: 24,
+      fontWeight: 'bold',
+      uppercase: false,
+      textColor: '#FFFFFF',
+      textOpacity: 1,
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      strokeColor: '#000000',
+      strokeWidth: 1.5,
+      shadowColor: '#000000',
+      shadowWidth: 1,
+      opacity: 1,
+      animation: 'fade',
+      position: 'bottom'
+    },
+    resolution: '1080p',
+    fps: 30
+  };
+};
+
 app.get('/api/projects', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -147,14 +194,8 @@ app.get('/api/projects', async (req, res) => {
 
     if (error) throw error;
 
-    // Map projects to dynamically compute aspect_ratio and fallback resolution/fps
-    const mapped = (data || []).map((p: any) => ({
-      ...p,
-      aspect_ratio: p.aspect_ratio || (p.width && p.height ? p.width / p.height : 16/9),
-      resolution: p.resolution || '1080p',
-      fps: p.fps || 30
-    }));
-
+    // Map projects database fields to frontend fields
+    const mapped = (data || []).map(mapProjectFromDb);
     res.json(mapped);
   } catch (err: any) {
     console.error('Failed to get projects:', err);
@@ -167,58 +208,50 @@ app.post('/api/projects', async (req, res) => {
   try {
     const projectData = req.body;
 
-    // Extract only the core columns that are guaranteed to exist in the database table
-    const corePayload = {
+    // Serialize captions and style into the lyrics_text column
+    const serializedData = JSON.stringify({
+      captions: projectData.captions || [],
+      style: projectData.style || {}
+    });
+
+    // Map payload to your actual database columns
+    const dbPayload: any = {
       name: projectData.name,
-      video_url: projectData.video_url,
+      video_path: projectData.video_url,
       video_filename: projectData.video_filename,
-      duration: projectData.duration,
-      width: projectData.width,
-      height: projectData.height,
-      captions: projectData.captions,
-      style: projectData.style
+      video_duration: projectData.duration,
+      video_width: projectData.width,
+      video_height: projectData.height,
+      lyrics_text: serializedData
     };
     
-    if (projectData.id) {
+    if (projectData.id && !isNaN(Number(projectData.id))) {
       // Update existing project
-      console.log(`Bypassing RLS: Updating project ID: ${projectData.id}`);
+      const projectIdInt = Number(projectData.id);
+      console.log(`Bypassing RLS: Updating project ID: ${projectIdInt}`);
       const { data, error } = await supabase
         .from('projects')
         .update({
-          ...corePayload,
+          ...dbPayload,
           updated_at: new Date()
         })
-        .eq('id', projectData.id)
+        .eq('id', projectIdInt)
         .select()
         .single();
 
       if (error) throw error;
-
-      const mapped = {
-        ...data,
-        aspect_ratio: data.aspect_ratio || (data.width && data.height ? data.width / data.height : 16/9),
-        resolution: data.resolution || '1080p',
-        fps: data.fps || 30
-      };
-      res.json(mapped);
+      res.json(mapProjectFromDb(data));
     } else {
       // Insert new project
       console.log(`Bypassing RLS: Inserting new project: "${projectData.name}"`);
       const { data, error } = await supabase
         .from('projects')
-        .insert(corePayload)
+        .insert(dbPayload)
         .select()
         .single();
 
       if (error) throw error;
-
-      const mapped = {
-        ...data,
-        aspect_ratio: data.aspect_ratio || (data.width && data.height ? data.width / data.height : 16/9),
-        resolution: data.resolution || '1080p',
-        fps: data.fps || 30
-      };
-      res.json(mapped);
+      res.json(mapProjectFromDb(data));
     }
   } catch (err: any) {
     console.error('Failed to save project:', err);
