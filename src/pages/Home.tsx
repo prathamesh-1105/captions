@@ -134,9 +134,9 @@ export default function Home({ onStart }: HomeProps) {
           backgroundColor: '#000000',
           backgroundOpacity: 0,
           strokeColor: '#000000',
-          strokeWidth: 1.5,
+          strokeWidth: 0,
           shadowColor: '#000000',
-          shadowWidth: 1,
+          shadowWidth: 0,
           opacity: 1,
           animation: 'fade' as const,
           position: 'bottom' as const
