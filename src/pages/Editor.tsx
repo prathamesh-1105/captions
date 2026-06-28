@@ -241,29 +241,29 @@ export default function Editor({
         }`}>
           {/* Action Toolbar */}
           <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
-            <div className="flex items-center gap-3 text-xs text-zinc-450">
-              <span className="font-semibold text-zinc-200">Timeline Editor</span>
-              <span>•</span>
-              <span className="truncate max-w-[200px]">{metadata.filename}</span>
-              <span>•</span>
-              <span>{captions.length} phrases</span>
-              <span>•</span>
+            <div className="flex items-center gap-2 sm:gap-3 text-xs text-zinc-450">
+              <span className="font-semibold text-zinc-200">Timeline</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="truncate max-w-[100px] sm:max-w-[200px] hidden sm:inline">{metadata.filename}</span>
+              <span className="hidden sm:inline">•</span>
+              <span className="hidden sm:inline">{captions.length} phrases</span>
+              <span className="hidden sm:inline">•</span>
               {saveStatus === 'saving' && (
                 <span className="flex items-center gap-1.5 text-zinc-400 font-medium select-none">
                   <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-ping" />
-                  Saving edits...
+                  Saving...
                 </span>
               )}
               {saveStatus === 'saved' && (
                 <span className="flex items-center gap-1.5 text-zinc-550 font-medium select-none">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Saved to database
+                  Saved
                 </span>
               )}
               {saveStatus === 'error' && (
                 <span className="flex items-center gap-1.5 text-red-400 font-semibold select-none">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  Auto-save failed
+                  Save error
                 </span>
               )}
             </div>

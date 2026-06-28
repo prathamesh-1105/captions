@@ -222,7 +222,7 @@ export default function Home({ onStart }: HomeProps) {
                 <input
                   type="text"
                   placeholder="http://192.168.1.15:5001"
-                  className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-full sm:w-44"
+                  className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-base sm:text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-full sm:w-44"
                   id="custom-backend-input"
                   defaultValue={API_BASE}
                 />
@@ -293,8 +293,11 @@ export default function Home({ onStart }: HomeProps) {
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-zinc-200">Drag & drop your video here</p>
-                      <p className="text-xs text-zinc-550 mt-1">Supports MP4, MOV, AVI, MKV</p>
+                      <p className="text-sm font-medium text-zinc-200">
+                        <span className="hidden sm:inline">Drag & drop your video here</span>
+                        <span className="sm:hidden">Tap to select video file</span>
+                      </p>
+                      <p className="text-xs text-zinc-555 mt-1">Supports MP4, MOV, AVI, MKV</p>
                     </div>
                     <button type="button" className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs font-semibold text-zinc-300 hover:bg-white/10 transition-colors">
                       Browse File
@@ -318,7 +321,7 @@ Looking for a place to hide
 
 (Unicode supported: English, Hindi, Marathi, Mixed)
 उदा: I love माझं city ❤️`}
-                className="w-full h-32 rounded-xl bg-zinc-900 border border-white/10 p-3.5 text-xs text-zinc-200 placeholder-zinc-550 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none leading-relaxed"
+                className="w-full h-32 rounded-xl bg-zinc-900 border border-white/10 p-3.5 text-base sm:text-xs text-zinc-200 placeholder-zinc-550 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 resize-none leading-relaxed"
               />
             </div>
 

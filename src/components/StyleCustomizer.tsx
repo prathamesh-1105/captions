@@ -43,7 +43,7 @@ export default function StyleCustomizer({ style, onChange }: StyleCustomizerProp
         <select
           value={style.fontFamily}
           onChange={(e) => updateStyle({ fontFamily: e.target.value })}
-          className="w-full bg-zinc-900 border border-white/10 rounded px-2 py-1.5 text-zinc-200 focus:outline-none focus:border-violet-500"
+          className="w-full bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-base sm:text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
         >
           {fonts.map(f => (
             <option key={f} value={f}>{f}</option>
@@ -274,7 +274,7 @@ export default function StyleCustomizer({ style, onChange }: StyleCustomizerProp
           <select
             value={style.position}
             onChange={(e) => updateStyle({ position: e.target.value as any })}
-            className="w-full bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-violet-500"
+            className="w-full bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-base sm:text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
           >
             <option value="bottom">Bottom (Default)</option>
             <option value="center">Center</option>
@@ -288,7 +288,7 @@ export default function StyleCustomizer({ style, onChange }: StyleCustomizerProp
           <select
             value={style.animation}
             onChange={(e) => updateStyle({ animation: e.target.value as any })}
-            className="w-full bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-zinc-200 focus:outline-none focus:border-violet-500"
+            className="w-full bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-base sm:text-xs text-zinc-200 focus:outline-none focus:border-violet-500"
           >
             <option value="none">None</option>
             <option value="fade">Fade In/Out</option>

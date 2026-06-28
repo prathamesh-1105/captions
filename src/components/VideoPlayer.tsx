@@ -197,6 +197,89 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     document.addEventListener('mouseup', handleMouseUpRotate);
   };
 
+  // Handle dragging caption block via touch (mobile)
+  const handleCaptionTouchStart = (e: React.TouchEvent) => {
+    if (!activeCaption) return;
+    e.stopPropagation();
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (style.position !== 'custom' && onUpdateStyle) {
+      onUpdateStyle({ position: 'custom' });
+    }
+
+    setSelectedCaptionId(activeCaption.id);
+
+    const rect = container.getBoundingClientRect();
+
+    const handleTouchMoveDrag = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const touch = moveEvent.touches[0];
+      
+      const rawX = touch.clientX - rect.left;
+      const rawY = touch.clientY - rect.top;
+
+      const xPct = Number(((rawX / rect.width) * 100).toFixed(1));
+      const yPct = Number(((rawY / rect.height) * 100).toFixed(1));
+
+      const clampedX = Math.max(5, Math.min(95, xPct));
+      const clampedY = Math.max(5, Math.min(95, yPct));
+
+      onUpdateCaption(activeCaption.id, { x: clampedX, y: clampedY });
+    };
+
+    const handleTouchEndDrag = () => {
+      document.removeEventListener('touchmove', handleTouchMoveDrag);
+      document.removeEventListener('touchend', handleTouchEndDrag);
+    };
+
+    document.addEventListener('touchmove', handleTouchMoveDrag, { passive: true });
+    document.addEventListener('touchend', handleTouchEndDrag);
+  };
+
+  // Handle rotating caption block via touch (mobile)
+  const handleCaptionTouchRotateStart = (e: React.TouchEvent) => {
+    if (!activeCaption) return;
+    e.stopPropagation();
+
+    const container = containerRef.current;
+    const captionEl = e.currentTarget.parentElement;
+    if (!container || !captionEl) return;
+
+    const rect = captionEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const handleTouchMoveRotate = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const touch = moveEvent.touches[0];
+
+      const dx = touch.clientX - centerX;
+      const dy = touch.clientY - centerY;
+
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      angle = (angle + 90) % 360;
+
+      if (angle > 180) {
+        angle -= 360;
+      }
+
+      const degrees = Math.round(angle);
+      setRotationAngle(degrees);
+      onUpdateCaption(activeCaption.id, { rotation: degrees });
+    };
+
+    const handleTouchEndRotate = () => {
+      setRotationAngle(null);
+      document.removeEventListener('touchmove', handleTouchMoveRotate);
+      document.removeEventListener('touchend', handleTouchEndRotate);
+    };
+
+    document.addEventListener('touchmove', handleTouchMoveRotate, { passive: true });
+    document.addEventListener('touchend', handleTouchEndRotate);
+  };
+
   // Dynamic inline styling for caption overlay matching selected parameters
   const getOverlayStyle = (): React.CSSProperties => {
     const textShadows: string[] = [];
@@ -286,6 +369,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
         <div
           style={getOverlayStyle()}
           onMouseDown={handleCaptionDragStart}
+          onTouchStart={handleCaptionTouchStart}
           className={`absolute pointer-events-auto transition-shadow ${
             selectedCaptionId === activeCaption.id
               ? 'ring-2 ring-violet-500 ring-offset-2 ring-offset-black/50 rounded-lg p-1'
@@ -296,6 +380,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
           {selectedCaptionId === activeCaption.id && (
             <div
               onMouseDown={handleCaptionRotateStart}
+              onTouchStart={handleCaptionTouchRotateStart}
               className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-violet-500 border border-white hover:scale-125 cursor-alias flex items-center justify-center shadow-lg transition-transform pointer-events-auto z-[9999]"
               title="Drag to Rotate Subtitle"
             >

@@ -180,6 +180,111 @@ export default function Timeline({
     document.addEventListener('mouseup', handleMouseUp);
   };
 
+  // Drag block via touch (mobile)
+  const handleBlockTouchStart = (e: React.TouchEvent, block: CaptionBlock) => {
+    e.stopPropagation();
+    onSelect(block.id);
+    setEditingId(null);
+
+    const startX = e.touches[0].clientX;
+    const initialStart = block.start;
+    const blockDuration = block.end - block.start;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const deltaX = moveEvent.touches[0].clientX - startX;
+      const deltaTime = deltaX / zoom;
+      
+      let newStart = Number((initialStart + deltaTime).toFixed(2));
+      let newEnd = Number((newStart + blockDuration).toFixed(2));
+
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = blockDuration;
+      }
+      if (newEnd > duration) {
+        newEnd = duration;
+        newStart = Number((duration - blockDuration).toFixed(2));
+      }
+
+      onUpdate(block.id, { start: newStart, end: newEnd });
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
+  // Resize Left via touch (mobile)
+  const handleResizeLeftTouchStart = (e: React.TouchEvent, block: CaptionBlock) => {
+    e.stopPropagation();
+    onSelect(block.id);
+
+    const startX = e.touches[0].clientX;
+    const initialStart = block.start;
+    const currentEnd = block.end;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const deltaX = moveEvent.touches[0].clientX - startX;
+      const deltaTime = deltaX / zoom;
+      
+      let newStart = Number((initialStart + deltaTime).toFixed(2));
+      
+      if (newStart < 0) newStart = 0;
+      if (currentEnd - newStart < 0.2) {
+        newStart = Number((currentEnd - 0.2).toFixed(2));
+      }
+
+      onUpdate(block.id, { start: newStart });
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
+  // Resize Right via touch (mobile)
+  const handleResizeRightTouchStart = (e: React.TouchEvent, block: CaptionBlock) => {
+    e.stopPropagation();
+    onSelect(block.id);
+
+    const startX = e.touches[0].clientX;
+    const initialEnd = block.end;
+    const currentStart = block.start;
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (moveEvent.touches.length === 0) return;
+      const deltaX = moveEvent.touches[0].clientX - startX;
+      const deltaTime = deltaX / zoom;
+      
+      let newEnd = Number((initialEnd + deltaTime).toFixed(2));
+      
+      if (newEnd > duration) newEnd = duration;
+      if (newEnd - currentStart < 0.2) {
+        newEnd = Number((currentStart + 0.2).toFixed(2));
+      }
+
+      onUpdate(block.id, { end: newEnd });
+    };
+
+    const handleTouchEnd = () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
   // Inline text edit triggers
   const handleDoubleClick = (block: CaptionBlock) => {
     setEditingId(block.id);
@@ -212,18 +317,19 @@ export default function Timeline({
     return ticks;
   };
 
+  const selectedBlock = captions.find(c => c.id === selectedId);
   const trackWidth = duration * zoom;
 
   return (
     <div className="flex-1 flex flex-col min-h-0 select-none">
       {/* Timeline Toolbar (zoom, actions) */}
-      <div className="h-10 border-b border-white/10 px-4 flex items-center justify-between text-xs bg-zinc-900">
-        <div className="flex items-center gap-2">
+      <div className="h-12 border-b border-white/10 px-4 flex items-center justify-between text-xs bg-zinc-900 overflow-x-auto gap-4 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onAdd}
-            className="px-2.5 py-1 rounded bg-violet-600/20 text-violet-400 border border-violet-500/20 hover:bg-violet-600/30 font-semibold flex items-center gap-1"
+            className="px-2.5 py-1 rounded bg-violet-600/20 text-violet-400 border border-violet-500/20 hover:bg-violet-600/30 font-semibold flex items-center gap-1 shrink-0"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             Add Block
@@ -232,19 +338,33 @@ export default function Timeline({
           {selectedId && (
             <button
               onClick={() => onDelete(selectedId)}
-              className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 border border-red-500/10 hover:bg-red-950/50 hover:text-red-300 font-medium flex items-center gap-1"
+              className="px-2.5 py-1 rounded bg-red-950/30 text-red-400 border border-red-500/10 hover:bg-red-950/50 hover:text-red-300 font-medium flex items-center gap-1 shrink-0"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.34 9m-4.72 0-.34-9m9.96-3-1.88 12.75a2.25 2.25 0 0 1-2.24 2.15H8.403a2.25 2.25 0 0 1-2.24-2.15L4.07 7.5m16.79 0c.553 0 1 .006 1.543.018m-1.543-.018-1.782-12.75a1.5 1.5 0 0 0-1.51-1.366H7.938a1.5 1.5 0 0 0-1.51 1.366L4.646 7.5m9.03 0v-2.25M9.375 7.5v-2.25M9.375 7.5h5.25" />
               </svg>
               Delete
             </button>
           )}
+
+          {/* Quick text input box */}
+          {selectedBlock && (
+            <div className="flex items-center gap-1.5 border-l border-white/10 pl-3 shrink-0">
+              <span className="text-[10px] text-zinc-450 font-bold uppercase hidden sm:inline">Text:</span>
+              <input
+                type="text"
+                value={selectedBlock.text}
+                onChange={(e) => onUpdate(selectedBlock.id, { text: e.target.value })}
+                className="bg-black/55 border border-white/10 rounded px-2.5 py-1 text-base sm:text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-36 sm:w-48 md:w-64"
+                placeholder="Edit caption..."
+              />
+            </div>
+          )}
         </div>
 
         {/* Zoom Controller */}
-        <div className="flex items-center gap-3">
-          <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <div className="flex items-center gap-3 shrink-0">
+          <svg className="w-4 h-4 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.637 10.637ZM10.5 7.5v6m3-3h-6" />
           </svg>
           <input
@@ -253,9 +373,9 @@ export default function Timeline({
             max="150"
             value={zoom}
             onChange={(e) => setZoom(Number(e.target.value))}
-            className="w-28 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-violet-600"
+            className="w-24 sm:w-28 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-violet-600 shrink-0"
           />
-          <span className="text-[10px] text-zinc-500 font-mono w-8">{zoom}px/s</span>
+          <span className="text-[10px] text-zinc-500 font-mono w-8 shrink-0">{zoom}px/s</span>
         </div>
       </div>
 
@@ -287,6 +407,7 @@ export default function Timeline({
                 <div
                   key={block.id}
                   onMouseDown={(e) => handleBlockDragStart(e, block)}
+                  onTouchStart={(e) => handleBlockTouchStart(e, block)}
                   onDoubleClick={() => handleDoubleClick(block)}
                   style={{
                     left: `${left}px`,
@@ -301,7 +422,8 @@ export default function Timeline({
                   {/* Left Resize Handle */}
                   <div
                     onMouseDown={(e) => handleResizeLeftStart(e, block)}
-                    className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-violet-500/50 rounded-l-lg"
+                    onTouchStart={(e) => handleResizeLeftTouchStart(e, block)}
+                    className="absolute left-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-violet-500/50 rounded-l-lg"
                     title="Resize start"
                   />
 
@@ -335,7 +457,8 @@ export default function Timeline({
                   {/* Right Resize Handle */}
                   <div
                     onMouseDown={(e) => handleResizeRightStart(e, block)}
-                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-violet-500/50 rounded-r-lg"
+                    onTouchStart={(e) => handleResizeRightTouchStart(e, block)}
+                    className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize hover:bg-violet-500/50 rounded-r-lg"
                     title="Resize end"
                   />
                 </div>
