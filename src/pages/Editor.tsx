@@ -4,6 +4,7 @@ import VideoPlayer from '../components/VideoPlayer';
 import Timeline from '../components/Timeline';
 import StyleCustomizer from '../components/StyleCustomizer';
 import PresetList from '../components/PresetList';
+import { getApiBase } from '../utils/api';
 
 interface EditorProps {
   projectId: string | null;
@@ -39,7 +40,7 @@ export default function Editor({
   const [zoom, setZoom] = useState<number>(50); // pixels per second
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>('saved');
   const [mobileTab, setMobileTab] = useState<'preview' | 'style'>('preview');
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const API_BASE = getApiBase();
 
   // Debounced auto-save hook to backend projects API
   useEffect(() => {

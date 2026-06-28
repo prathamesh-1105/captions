@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import os from 'os';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
@@ -427,6 +428,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date() });
 });
 
+function getLocalIpAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const devName in interfaces) {
+    const iface = interfaces[devName];
+    if (iface) {
+      for (const alias of iface) {
+        if (alias.family === 'IPv4' && !alias.internal) {
+          return alias.address;
+        }
+      }
+    }
+  }
+  return 'localhost';
+}
+
 app.listen(PORT, () => {
-  console.log(`CaptionFlow AI stateless server running on http://localhost:${PORT}`);
+  const localIp = getLocalIpAddress();
+  console.log(`\n======================================================`);
+  console.log(`CaptionFlow AI stateless server running locally!`);
+  console.log(`- Local access:   http://localhost:${PORT}`);
+  console.log(`- Network access: http://${localIp}:${PORT}`);
+  console.log(`======================================================\n`);
 });

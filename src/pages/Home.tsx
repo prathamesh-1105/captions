@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { distributeCaptions } from '../utils/timeline';
+import { getApiBase } from '../utils/api';
 import type { VideoMetadata, CaptionBlock } from '../types';
 
 interface HomeProps {
@@ -8,7 +9,7 @@ interface HomeProps {
 }
 
 export default function Home({ onStart }: HomeProps) {
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const API_BASE = getApiBase();
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [lyricsText, setLyricsText] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -203,13 +204,41 @@ export default function Home({ onStart }: HomeProps) {
         </div>
 
         {error && (
-          <div className="p-4 rounded-lg bg-red-950/50 border border-red-500/30 text-red-200 text-xs flex items-center gap-2">
-            <svg className="w-4.5 h-4.5 text-red-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-            </svg>
-            <div className="space-y-1">
-              <p className="font-semibold">Setup / Connection Error</p>
-              <p>{error}</p>
+          <div className="p-4 rounded-lg bg-red-950/50 border border-red-500/30 text-red-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-2.5">
+              <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+              </svg>
+              <div className="space-y-1">
+                <p className="font-semibold">Setup / Connection Error</p>
+                <p>{error}</p>
+              </div>
+            </div>
+            
+            {/* LAN Custom Connection Input */}
+            <div className="flex flex-col gap-1.5 shrink-0 bg-black/30 p-2.5 rounded-lg border border-white/5 w-full sm:w-auto">
+              <span className="text-[10px] text-zinc-400 font-semibold">Connect to desktop backend IP:</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="http://192.168.1.15:5001"
+                  className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-full sm:w-44"
+                  id="custom-backend-input"
+                  defaultValue={API_BASE}
+                />
+                <button
+                  onClick={() => {
+                    const val = (document.getElementById('custom-backend-input') as HTMLInputElement)?.value;
+                    if (val) {
+                      localStorage.setItem('backend_url', val.trim());
+                      window.location.reload();
+                    }
+                  }}
+                  className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded text-xs text-white font-semibold transition-colors shrink-0"
+                >
+                  Connect
+                </button>
+              </div>
             </div>
           </div>
         )}
