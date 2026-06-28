@@ -230,13 +230,13 @@ export default function Editor({
       </div>
 
       {/* Workspace Area: Player & Sidebar */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
         
         {/* Left Side: Video Preview Column */}
         <div className={`flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40 lg:flex-1 lg:h-full lg:min-h-0 ${
           mobileTab === 'preview' 
-            ? 'flex-1 min-h-[380px]' 
-            : 'h-[200px] border-b border-white/5 p-2 gap-2 lg:h-auto lg:border-b-0'
+            ? 'flex-1 min-h-0' 
+            : 'h-[160px] border-b border-white/5 p-2 gap-2 lg:h-auto lg:border-b-0'
         }`}>
           {/* Action Toolbar */}
           <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
@@ -380,10 +380,10 @@ export default function Editor({
       </div>
 
       {/* Bottom Area: Timeline Editor */}
-      <div className={`h-64 border-t border-white/10 bg-zinc-950 flex flex-col min-h-0 ${
+      <div className={`border-t border-white/10 bg-zinc-950 flex flex-col min-h-0 ${
         mobileTab === 'preview' 
-          ? 'flex' 
-          : 'hidden lg:flex'
+          ? 'h-52 lg:h-64 flex' 
+          : 'hidden lg:flex lg:h-64'
       }`}>
         <Timeline
           duration={metadata.duration}
