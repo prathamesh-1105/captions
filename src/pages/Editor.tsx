@@ -38,6 +38,7 @@ export default function Editor({
   const [selectedCaptionId, setSelectedCaptionId] = useState<string | null>(null);
   const [zoom, setZoom] = useState<number>(50); // pixels per second
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>('saved');
+  const [mobileTab, setMobileTab] = useState<'preview' | 'style'>('preview');
   const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
   // Debounced auto-save hook to backend projects API
@@ -197,11 +198,46 @@ export default function Editor({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-black">
+      {/* Mobile Segmented Tab Selector */}
+      <div className="lg:hidden flex border-b border-white/5 bg-zinc-950 p-2 gap-2 shrink-0">
+        <button
+          onClick={() => setMobileTab('preview')}
+          className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            mobileTab === 'preview'
+              ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+              : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+          </svg>
+          Video Preview
+        </button>
+        <button
+          onClick={() => setMobileTab('style')}
+          className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            mobileTab === 'style'
+              ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/20'
+              : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 0 0-3.078 0L3.723 17.8A3 3 0 0 0 2.25 20.4V21a.75.75 0 0 0 .75.75h18a.75.75 0 0 0 .75-.75v-.6a3 3 0 0 0-1.473-2.6L17.55 16.12a3 3 0 0 0-3.078 0L12 17.568l-2.47-1.446Z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.25a.75.75 0 0 1 .75.75v1.25H15a.75.75 0 0 1 0 1.5h-2.25V7a.75.75 0 0 1-1.5 0V5.75H9a.75.75 0 0 1 0-1.5h2.25V3a.75.75 0 0 1 .75-.75Z" />
+          </svg>
+          Style Presets
+        </button>
+      </div>
+
       {/* Workspace Area: Player & Sidebar */}
       <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
         
         {/* Left Side: Video Preview Column */}
-        <div className="flex-1 flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40 min-h-[380px] lg:min-h-0">
+        <div className={`flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40 lg:flex-1 lg:h-full lg:min-h-0 ${
+          mobileTab === 'preview' 
+            ? 'flex-1 min-h-[380px]' 
+            : 'h-[200px] border-b border-white/5 p-2 gap-2 lg:h-auto lg:border-b-0'
+        }`}>
           {/* Action Toolbar */}
           <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
             <div className="flex items-center gap-3 text-xs text-zinc-450">
@@ -257,7 +293,11 @@ export default function Editor({
           </div>
 
           {/* Video Player Display Container */}
-          <div className="flex-1 min-h-0 flex items-center justify-center relative bg-black/80 rounded-xl overflow-hidden border border-white/5">
+          <div className={`relative bg-black/80 rounded-xl overflow-hidden border border-white/5 flex items-center justify-center ${
+            mobileTab === 'preview' 
+              ? 'flex-1 min-h-0' 
+              : 'h-full w-full'
+          }`}>
             <VideoPlayer
               ref={videoRef}
               blobUrl={metadata.blobUrl}
@@ -276,7 +316,11 @@ export default function Editor({
         </div>
 
         {/* Right Side: Styling and Presets Toolbar */}
-        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col bg-zinc-950 shrink-0 min-h-0 lg:h-full">
+        <div className={`w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col bg-zinc-950 shrink-0 min-h-0 lg:h-full ${
+          mobileTab === 'style' 
+            ? 'flex-1' 
+            : 'hidden lg:flex'
+        }`}>
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             
             {/* Gallery of Presets */}
@@ -336,7 +380,11 @@ export default function Editor({
       </div>
 
       {/* Bottom Area: Timeline Editor */}
-      <div className="h-64 border-t border-white/10 bg-zinc-950 flex flex-col min-h-0">
+      <div className={`h-64 border-t border-white/10 bg-zinc-950 flex flex-col min-h-0 ${
+        mobileTab === 'preview' 
+          ? 'flex' 
+          : 'hidden lg:flex'
+      }`}>
         <Timeline
           duration={metadata.duration}
           currentTime={currentTime}
