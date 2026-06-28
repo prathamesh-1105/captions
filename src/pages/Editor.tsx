@@ -327,7 +327,22 @@ export default function Editor({
             {/* Gallery of Presets */}
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">Style Presets</h3>
-              <PresetList currentStyle={style} onSelectPreset={setStyle} />
+              <PresetList
+                currentStyle={style}
+                onSelectPreset={(presetStyle) => {
+                  setStyle(prev => ({
+                    ...prev,
+                    fontFamily: presetStyle.fontFamily,
+                    fontSize: presetStyle.fontSize,
+                    fontWeight: presetStyle.fontWeight,
+                    uppercase: presetStyle.uppercase,
+                    textColor: presetStyle.textColor,
+                    textOpacity: presetStyle.textOpacity,
+                    animation: presetStyle.animation,
+                    position: presetStyle.position === 'custom' ? prev.position : presetStyle.position
+                  }));
+                }}
+              />
             </div>
 
             {/* Customizer properties */}

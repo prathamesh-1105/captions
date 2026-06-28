@@ -42,7 +42,9 @@ export type PresetType =
   | 'yellow-pop'
   | 'insta-gradient'
   | 'cyberpunk'
-  | 'aesthetic-vlog';
+  | 'aesthetic-vlog'
+  | 'insta-yellow'
+  | 'insta-white';
 
 export interface VideoMetadata {
   filename: string;
