@@ -328,6 +328,7 @@ app.post('/api/export', async (req, res) => {
       }
 
       const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      const hasAudio = metadata.streams.some(s => s.codec_type === 'audio');
       const origWidth = videoStream?.width || 1920;
       const origHeight = videoStream?.height || 1080;
       const aspectRatio = origWidth / origHeight;
@@ -345,15 +346,24 @@ app.post('/api/export', async (req, res) => {
 
       console.log(`Running FFmpeg burn subtitles filter: ${resolution} @ ${fps}fps`);
 
-      ffmpeg(tempInputPath)
+      const ffCommand = ffmpeg(tempInputPath)
         .videoFilters(videoFilters)
-        .videoCodec('libx264')
-        .audioCodec('aac')
+        .videoCodec('libx264');
+
+      // Direct-copy audio streams to avoid audio transcoding lag, or disable audio entirely
+      if (hasAudio) {
+        ffCommand.audioCodec('copy');
+      } else {
+        ffCommand.noAudio();
+      }
+
+      ffCommand
         .outputOptions([
-          '-crf 20',          // High visual quality
-          '-preset medium',   // Balance speed/efficiency
-          '-pix_fmt yuv420p', // Web/quicktime compatibility
-          `-r ${fps}`
+          '-crf 22',            // Optimal speed-to-size balance
+          '-preset ultrafast',  // High-velocity rendering preset (as fast as a phoenix!)
+          '-pix_fmt yuv420p',   // Web/quicktime compatibility
+          `-r ${fps}`,
+          '-threads 0'          // Force maximum CPU thread utilization
         ])
         .on('end', async () => {
           console.log('FFmpeg processing completed. Uploading final video to Supabase Storage...');

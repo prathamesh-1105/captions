@@ -10,6 +10,7 @@ server/dist/
 server/uploads/
 server/outputs/
 server/temp_subs/
+server/temp_workspace/
 
 # Environment variables
 .env
