@@ -7,15 +7,20 @@ export function getApiBase(): string {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) return envUrl;
 
-  // 3. Dynamic IP resolution: If accessing the site on a local IP (e.g., 192.168.x.x),
-  // automatically route requests to the same local IP on port 5001
   const hostname = window.location.hostname;
+
+  // 3. Local dev server
+  if (hostname === 'localhost') {
+    return 'http://localhost:5001';
+  }
+
+  // 4. Dynamic IP resolution: If accessing the site on a local IP (e.g., 192.168.x.x),
+  // automatically route requests to the same local IP on port 5001
   const isLocalIp = /^(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname);
-  
-  if (hostname && hostname !== 'localhost' && isLocalIp) {
+  if (isLocalIp) {
     return `http://${hostname}:5001`;
   }
 
-  // 4. Default fallback
-  return 'http://localhost:5001';
+  // 5. Cloud deployment fallback: use relative paths so they resolve to the same hosted domain
+  return '';
 }
