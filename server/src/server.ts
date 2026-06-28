@@ -447,7 +447,7 @@ if (process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     const localIp = getLocalIpAddress();
     console.log(`\n======================================================`);
-    console.log(`CaptionFlow AI stateless server running locally!`);
+    console.log(`capme AI stateless server running locally!`);
     console.log(`- Local access:   http://localhost:${PORT}`);
     console.log(`- Network access: http://${localIp}:${PORT}`);
     console.log(`======================================================\n`);
