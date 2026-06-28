@@ -277,7 +277,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
         src={blobUrl}
         onTimeUpdate={handleTimeUpdate}
         onClick={togglePlay}
-        className="max-w-full max-h-full aspect-video object-contain"
+        className="max-w-full max-h-full object-contain"
         preload="auto"
       />
 

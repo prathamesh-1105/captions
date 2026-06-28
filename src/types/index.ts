@@ -38,7 +38,11 @@ export type PresetType =
   | 'neon'
   | 'luxury'
   | 'apple'
-  | 'floating';
+  | 'floating'
+  | 'yellow-pop'
+  | 'insta-gradient'
+  | 'cyberpunk'
+  | 'aesthetic-vlog';
 
 export interface VideoMetadata {
   filename: string;
