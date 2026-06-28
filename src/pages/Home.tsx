@@ -215,31 +215,50 @@ export default function Home({ onStart }: HomeProps) {
               </div>
             </div>
             
-            {/* LAN Custom Connection Input */}
-            <div className="flex flex-col gap-1.5 shrink-0 bg-black/30 p-2.5 rounded-lg border border-white/5 w-full sm:w-auto">
-              <span className="text-[10px] text-zinc-400 font-semibold">Connect to desktop backend IP:</span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="http://192.168.1.15:5001"
-                  className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-base sm:text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-full sm:w-44"
-                  id="custom-backend-input"
-                  defaultValue={API_BASE}
-                />
+            {/* If we have a custom URL saved, show a button to clear it */}
+            {localStorage.getItem('backend_url') ? (
+              <div className="flex flex-col gap-1.5 shrink-0 bg-black/30 p-2.5 rounded-lg border border-white/5 w-full sm:w-auto">
+                <span className="text-[10px] text-zinc-400 font-semibold">Saved Connection IP:</span>
+                <div className="text-[11px] font-mono text-zinc-300 break-all max-w-[200px]">
+                  {localStorage.getItem('backend_url')}
+                </div>
                 <button
                   onClick={() => {
-                    const val = (document.getElementById('custom-backend-input') as HTMLInputElement)?.value;
-                    if (val) {
-                      localStorage.setItem('backend_url', val.trim());
-                      window.location.reload();
-                    }
+                    localStorage.removeItem('backend_url');
+                    window.location.reload();
                   }}
-                  className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded text-xs text-white font-semibold transition-colors shrink-0"
+                  className="mt-1 px-3 py-1.5 bg-red-650 hover:bg-red-555 rounded text-xs text-white font-semibold transition-colors shrink-0"
                 >
-                  Connect
+                  Disconnect & Use Cloud Backend
                 </button>
               </div>
-            </div>
+            ) : (
+              /* LAN Custom Connection Input */
+              <div className="flex flex-col gap-1.5 shrink-0 bg-black/30 p-2.5 rounded-lg border border-white/5 w-full sm:w-auto">
+                <span className="text-[10px] text-zinc-400 font-semibold">Connect to desktop backend IP:</span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="http://192.168.1.15:5001"
+                    className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-base sm:text-xs text-white placeholder-zinc-550 focus:outline-none focus:border-violet-500 w-full sm:w-44"
+                    id="custom-backend-input"
+                    defaultValue={API_BASE}
+                  />
+                  <button
+                    onClick={() => {
+                      const val = (document.getElementById('custom-backend-input') as HTMLInputElement)?.value;
+                      if (val) {
+                        localStorage.setItem('backend_url', val.trim());
+                        window.location.reload();
+                      }
+                    }}
+                    className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded text-xs text-white font-semibold transition-colors shrink-0"
+                  >
+                    Connect
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
