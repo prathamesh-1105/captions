@@ -22,6 +22,21 @@ export default function StyleCustomizer({ style, onChange }: StyleCustomizerProp
 
   return (
     <div className="space-y-4 text-xs">
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <span className="text-[10px] uppercase font-bold text-zinc-400">Layout Presets</span>
+        <button
+          onClick={() => updateStyle({
+            strokeWidth: 0,
+            shadowWidth: 0,
+            glowWidth: 0,
+            backgroundOpacity: 0
+          })}
+          className="text-[10px] text-violet-400 hover:text-violet-300 font-semibold hover:underline bg-transparent border-none cursor-pointer"
+        >
+          Reset to Flat Text
+        </button>
+      </div>
+
       {/* Font Section */}
       <div className="space-y-2">
         <label className="text-[10px] uppercase font-bold text-zinc-500">Font Family</label>
