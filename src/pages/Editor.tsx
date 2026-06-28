@@ -198,10 +198,10 @@ export default function Editor({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-black">
       {/* Workspace Area: Player & Sidebar */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
         
         {/* Left Side: Video Preview Column */}
-        <div className="flex-1 flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40">
+        <div className="flex-1 flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40 min-h-[380px] lg:min-h-0">
           {/* Action Toolbar */}
           <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
             <div className="flex items-center gap-3 text-xs text-zinc-450">
@@ -276,7 +276,7 @@ export default function Editor({
         </div>
 
         {/* Right Side: Styling and Presets Toolbar */}
-        <div className="w-80 border-l border-white/10 flex flex-col bg-zinc-950 min-h-0">
+        <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col bg-zinc-950 shrink-0 min-h-0 lg:h-full">
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             
             {/* Gallery of Presets */}
