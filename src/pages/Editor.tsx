@@ -270,6 +270,7 @@ export default function Editor({
               selectedCaptionId={selectedCaptionId}
               setSelectedCaptionId={setSelectedCaptionId}
               onUpdateCaption={handleUpdateCaption}
+              onUpdateStyle={(s) => setStyle(prev => ({ ...prev, ...s }))}
             />
           </div>
         </div>

@@ -276,16 +276,19 @@ app.post('/api/export', async (req, res) => {
   }
 
   // 1. Fetch project metadata from Supabase
-  const { data: project, error: dbError } = await supabase
+  const { data: rawProject, error: dbError } = await supabase
     .from('projects')
     .select('*')
     .eq('id', projectId)
     .single();
 
-  if (dbError || !project) {
+  if (dbError || !rawProject) {
     console.error('Error fetching project from Supabase:', dbError);
     return res.status(404).json({ error: `Project not found: ${dbError?.message || 'Invalid ID'}` });
   }
+
+  // Map raw database columns to frontend schema properties
+  const project = mapProjectFromDb(rawProject);
 
   const {
     name: videoName,

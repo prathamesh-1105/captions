@@ -5,6 +5,7 @@ export interface CaptionBlock {
   end: number;   // in seconds
   x?: number;    // percentage 0-100 (optional)
   y?: number;    // percentage 0-100 (optional)
+  rotation?: number; // tilt in degrees (optional)
 }
 
 export interface CaptionStyle {
@@ -147,6 +148,11 @@ export function generateAssFile(
       const posX = Math.round((cap.x / 100) * playResX);
       const posY = Math.round((cap.y / 100) * playResY);
       tags += `\\pos(${posX},${posY})`;
+    }
+
+    // Custom rotation/tilt tag {\frz<degrees>}
+    if (cap.rotation !== undefined && cap.rotation !== 0) {
+      tags += `\\frz${cap.rotation}`;
     }
 
     // Animations (Fade, Slide Up, Pop)

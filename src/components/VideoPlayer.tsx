@@ -13,6 +13,7 @@ interface VideoPlayerProps {
   selectedCaptionId: string | null;
   setSelectedCaptionId: (id: string | null) => void;
   onUpdateCaption: (id: string, fields: Partial<CaptionBlock>) => void;
+  onUpdateStyle?: (s: Partial<CaptionStyle>) => void;
 }
 
 const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
@@ -25,7 +26,8 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
   setIsPlaying,
   selectedCaptionId,
   setSelectedCaptionId,
-  onUpdateCaption
+  onUpdateCaption,
+  onUpdateStyle
 }, ref) => {
   const localRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,6 +35,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showControls, setShowControls] = useState<boolean>(true);
+  const [rotationAngle, setRotationAngle] = useState<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
 
   // Sync internal ref with forwarded ref
@@ -107,12 +110,17 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
 
   // Handle dragging caption block directly on video preview
   const handleCaptionDragStart = (e: React.MouseEvent) => {
-    if (style.position !== 'custom' || !activeCaption) return;
+    if (!activeCaption) return;
     e.preventDefault();
     e.stopPropagation();
 
     const container = containerRef.current;
     if (!container) return;
+
+    // Automatically switch to custom positioning when user starts dragging
+    if (style.position !== 'custom' && onUpdateStyle) {
+      onUpdateStyle({ position: 'custom' });
+    }
 
     // Deselect other UI and highlight active caption in timeline
     setSelectedCaptionId(activeCaption.id);
@@ -144,6 +152,51 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     document.addEventListener('mouseup', handleMouseUpDrag);
   };
 
+  // Handle rotating / tilting the caption block
+  const handleCaptionRotateStart = (e: React.MouseEvent) => {
+    if (!activeCaption) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const container = containerRef.current;
+    const captionEl = e.currentTarget.parentElement;
+    if (!container || !captionEl) return;
+
+    const rect = captionEl.getBoundingClientRect();
+    // Center of the caption element
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const handleMouseMoveRotate = (moveEvent: MouseEvent) => {
+      const dx = moveEvent.clientX - centerX;
+      const dy = moveEvent.clientY - centerY;
+
+      // Calculate angle in radians, convert to degrees
+      let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      
+      // Offset by 90 degrees since our rotation handle is at the top
+      angle = (angle + 90) % 360;
+
+      // Normalize to -180 to 180 degrees range
+      if (angle > 180) {
+        angle -= 360;
+      }
+
+      const degrees = Math.round(angle);
+      setRotationAngle(degrees);
+      onUpdateCaption(activeCaption.id, { rotation: degrees });
+    };
+
+    const handleMouseUpRotate = () => {
+      setRotationAngle(null);
+      document.removeEventListener('mousemove', handleMouseMoveRotate);
+      document.removeEventListener('mouseup', handleMouseUpRotate);
+    };
+
+    document.addEventListener('mousemove', handleMouseMoveRotate);
+    document.addEventListener('mouseup', handleMouseUpRotate);
+  };
+
   // Dynamic inline styling for caption overlay matching selected parameters
   const getOverlayStyle = (): React.CSSProperties => {
     const textShadows: string[] = [];
@@ -165,19 +218,21 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
 
     // Position coordinate mapping
     let posStyles: React.CSSProperties = {};
+    const rot = activeCaption ? (activeCaption.rotation || 0) : 0;
+    
     if (style.position === 'top') {
-      posStyles = { top: '12%', left: '50%', transform: 'translate(-50%, 0)' };
+      posStyles = { top: '12%', left: '50%', transform: `translate(-50%, 0) rotate(${rot}deg)` };
     } else if (style.position === 'center') {
-      posStyles = { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+      posStyles = { top: '50%', left: '50%', transform: `translate(-50%, -50%) rotate(${rot}deg)` };
     } else if (style.position === 'bottom') {
-      posStyles = { bottom: '12%', left: '50%', transform: 'translate(-50%, 0)' };
+      posStyles = { bottom: '12%', left: '50%', transform: `translate(-50%, 0) rotate(${rot}deg)` };
     } else if (style.position === 'custom' && activeCaption) {
       const x = activeCaption.x !== undefined ? activeCaption.x : 50;
       const y = activeCaption.y !== undefined ? activeCaption.y : 85;
       posStyles = { 
         top: `${y}%`, 
         left: `${x}%`, 
-        transform: 'translate(-50%, -50%)' 
+        transform: `translate(-50%, -50%) rotate(${rot}deg)` 
       };
     }
 
@@ -232,11 +287,32 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
           style={getOverlayStyle()}
           onMouseDown={handleCaptionDragStart}
           className={`absolute pointer-events-auto transition-shadow ${
-            style.position === 'custom' && selectedCaptionId === activeCaption.id
+            selectedCaptionId === activeCaption.id
               ? 'ring-2 ring-violet-500 ring-offset-2 ring-offset-black/50 rounded-lg p-1'
               : ''
           }`}
         >
+          {/* Rotation Handle */}
+          {selectedCaptionId === activeCaption.id && (
+            <div
+              onMouseDown={handleCaptionRotateStart}
+              className="absolute -top-7 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-violet-500 border border-white hover:scale-125 cursor-alias flex items-center justify-center shadow-lg transition-transform pointer-events-auto z-[9999]"
+              title="Drag to Rotate Subtitle"
+            >
+              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[1.5px] h-3 bg-violet-500/80 pointer-events-none" />
+            </div>
+          )}
+
+          {/* Angle Display Badge */}
+          {rotationAngle !== null && selectedCaptionId === activeCaption.id && (
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-zinc-900 border border-white/10 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow pointer-events-none z-[9999]">
+              {rotationAngle}°
+            </div>
+          )}
+
           {style.backgroundOpacity > 0 ? (
             <span style={getBackgroundStyle()}>
               {activeCaption.text}

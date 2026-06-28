@@ -5,6 +5,7 @@ export interface CaptionBlock {
   end: number;   // in seconds
   x?: number;    // percentage 0-100 (optional, default 50%)
   y?: number;    // percentage 0-100 (optional, default 85%)
+  rotation?: number; // tilt in degrees (optional, default 0)
 }
 
 export interface CaptionStyle {
