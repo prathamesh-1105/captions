@@ -27,9 +27,14 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Create necessary temp folders
-const TEMP_DIR = path.join(__dirname, '..', 'temp_workspace');
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+// Create necessary temp folders (redirect to os.tmpdir() in Vercel read-only serverless environment)
+const isVercel = process.env.VERCEL === '1';
+const TEMP_DIR = isVercel 
+  ? path.join(os.tmpdir(), 'temp_workspace') 
+  : path.join(__dirname, '..', 'temp_workspace');
+const UPLOADS_DIR = isVercel 
+  ? path.join(os.tmpdir(), 'uploads') 
+  : path.join(__dirname, '..', 'uploads');
 
 [TEMP_DIR, UPLOADS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) {
