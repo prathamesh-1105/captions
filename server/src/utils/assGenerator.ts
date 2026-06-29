@@ -184,6 +184,9 @@ export function generateAssFile(
       // Scale from 80% to 100% over 150ms
       // We can use \t transform tags for font scale: {\fscx80\fscy80\t(0,150,\fscx100\fscy100)}
       tags += `\\fscx80\\fscy80\\t(0,150,\\fscx100\\fscy100)`;
+    } else if (style.animation === 'squeeze') {
+      // Bouncy squeeze animation: initial squash (130% X, 60% Y), morph to stretch (85% X, 120% Y) at 120ms, settle at 220ms (100% X/Y)
+      tags += `\\fscx130\\fscy60\\t(0,120,\\fscx85\\fscy120)\\t(120,220,\\fscx100\\fscy100)`;
     }
 
     const dialogueLine = tags ? `{\\an${alignment}${tags}}${text}` : text;

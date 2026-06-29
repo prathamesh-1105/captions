@@ -295,6 +295,7 @@ export default function StyleCustomizer({ style, onChange }: StyleCustomizerProp
             <option value="slide-up">Slide Up</option>
             <option value="pop">Pop (Bouncy)</option>
             <option value="scale">Zoom In</option>
+            <option value="squeeze">Yellow Squeeze</option>
           </select>
         </div>
       </div>

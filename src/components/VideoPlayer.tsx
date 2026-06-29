@@ -379,6 +379,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
       {/* Styled Caption Overlay (HTML / CSS Canvas Simulation) */}
       {activeCaption && (
         <div
+          key={activeCaption.id}
           style={getOverlayStyle()}
           onMouseDown={handleCaptionDragStart}
           onTouchStart={handleCaptionTouchStart}
@@ -411,11 +412,16 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
           )}
 
           {style.backgroundOpacity > 0 ? (
-            <span style={getBackgroundStyle()}>
+            <span 
+              style={getBackgroundStyle()}
+              className={style.animation !== 'none' ? `animate-${style.animation}` : ''}
+            >
               {activeCaption.text}
             </span>
           ) : (
-            <span>{activeCaption.text}</span>
+            <span className={style.animation !== 'none' ? `animate-${style.animation}` : ''}>
+              {activeCaption.text}
+            </span>
           )}
         </div>
       )}

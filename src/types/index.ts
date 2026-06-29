@@ -24,7 +24,7 @@ export interface CaptionStyle {
   glowColor?: string;     // #RRGGBB
   glowWidth?: number;     // 0-10
   opacity: number;        // 0-1
-  animation: 'none' | 'fade' | 'slide-up' | 'pop' | 'scale';
+  animation: 'none' | 'fade' | 'slide-up' | 'pop' | 'scale' | 'squeeze';
   position: 'top' | 'center' | 'bottom' | 'custom';
 }
 
@@ -44,7 +44,8 @@ export type PresetType =
   | 'cyberpunk'
   | 'aesthetic-vlog'
   | 'insta-yellow'
-  | 'insta-white';
+  | 'insta-white'
+  | 'insta-squeeze';
 
 export interface VideoMetadata {
   filename: string;
