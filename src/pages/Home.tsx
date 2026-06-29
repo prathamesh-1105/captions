@@ -16,10 +16,11 @@ export default function Home({ onStart }: HomeProps) {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
+  const [serverInfo, setServerInfo] = useState<{ url: string } | null>(null);
 
-  // Fetch recent projects from Backend on mount (bypasses RLS)
+  // Fetch recent projects and server info from Backend on mount (bypasses RLS)
   useEffect(() => {
-    async function fetchRecentProjects() {
+    async function fetchInitialData() {
       try {
         const response = await fetch(`${API_BASE}/api/projects`);
         const contentType = response.headers.get('content-type') || '';
@@ -29,15 +30,29 @@ export default function Home({ onStart }: HomeProps) {
           setRecentProjects(data || []);
         } else {
           console.error('Failed to retrieve recent projects from backend: Non-JSON response.');
-          setError(`Connection error: Received HTML page instead of JSON data. Fetch URL was: ${API_BASE}/api/projects. (Is your local server running on port 5000?)`);
+          setError(`Connection error: Received HTML page instead of JSON data. Fetch URL was: ${API_BASE}/api/projects.`);
         }
       } catch (err: any) {
         console.error('Failed to connect to backend server:', err);
         setError(`Failed to connect to rendering backend: ${err.message}. Fetch URL: ${API_BASE}/api/projects`);
       }
+
+      // Fetch server network configuration for mobile preview helper
+      try {
+        const response = await fetch(`${API_BASE}/api/info`);
+        if (response.ok) {
+          const data = await response.json();
+          const isVercel = window.location.hostname.includes('vercel.app');
+          if (data && data.url && (!isVercel || window.location.hostname === 'localhost')) {
+            setServerInfo(data);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch server network configuration info:', err);
+      }
     }
-    fetchRecentProjects();
-  }, []);
+    fetchInitialData();
+  }, [API_BASE]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -202,6 +217,23 @@ export default function Home({ onStart }: HomeProps) {
             Stateless video editing backed by Supabase and FFmpeg. Upload once, edit from anywhere, and export up to 4K.
           </p>
         </div>
+
+        {serverInfo && (
+          <div className="max-w-xl mx-auto bg-zinc-900/60 border border-white/5 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs shadow-md">
+            <div className="flex items-center gap-2.5 text-zinc-300">
+              <svg className="w-5 h-5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+              </svg>
+              <div className="text-left">
+                <p className="font-semibold text-zinc-200">📱 Mobile Device Connection</p>
+                <p className="text-[10px] text-zinc-450 mt-0.5">Use this IP URL in the connection box on your phone:</p>
+              </div>
+            </div>
+            <code className="bg-black/50 border border-white/10 rounded px-2.5 py-1 text-violet-400 font-mono font-bold select-all text-[11px] shrink-0">
+              {serverInfo.url}
+            </code>
+          </div>
+        )}
 
         {error && (
           <div className="p-4 rounded-lg bg-red-950/50 border border-red-500/30 text-red-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">

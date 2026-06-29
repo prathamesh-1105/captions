@@ -438,6 +438,16 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date() });
 });
 
+// Server configuration info endpoint (e.g., provides network URL for mobile connection)
+app.get('/api/info', (req, res) => {
+  const localIp = getLocalIpAddress();
+  res.json({
+    localIp,
+    port: PORT,
+    url: `http://${localIp}:${PORT}`
+  });
+});
+
 function getLocalIpAddress() {
   const interfaces = os.networkInterfaces();
   for (const devName in interfaces) {
