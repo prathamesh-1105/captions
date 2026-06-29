@@ -108,9 +108,13 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     };
   }, []);
 
-  // Handle dragging caption block directly on video preview
+  // Handle dragging caption block directly on video preview (double click and hold on desktop)
   const handleCaptionDragStart = (e: React.MouseEvent) => {
     if (!activeCaption) return;
+    
+    // Only allow drag on double-click/double-tap and hold to prevent accidental movement
+    if (e.detail < 2) return;
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -197,9 +201,13 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     document.addEventListener('mouseup', handleMouseUpRotate);
   };
 
-  // Handle dragging caption block via touch (mobile)
+  // Handle dragging caption block via touch (mobile - two-finger pinch/drag)
   const handleCaptionTouchStart = (e: React.TouchEvent) => {
     if (!activeCaption) return;
+    
+    // Only allow drag if exactly 2 fingers are touching to prevent conflicting with page scroll
+    if (e.touches.length !== 2) return;
+    
     e.stopPropagation();
 
     const container = containerRef.current;
@@ -214,11 +222,15 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     const rect = container.getBoundingClientRect();
 
     const handleTouchMoveDrag = (moveEvent: TouchEvent) => {
-      if (moveEvent.touches.length === 0) return;
-      const touch = moveEvent.touches[0];
+      // Only drag if exactly 2 fingers are still touching
+      if (moveEvent.touches.length !== 2) return;
       
-      const rawX = touch.clientX - rect.left;
-      const rawY = touch.clientY - rect.top;
+      const t1 = moveEvent.touches[0];
+      const t2 = moveEvent.touches[1];
+      
+      // Calculate midpoint between two touch contacts
+      const rawX = ((t1.clientX + t2.clientX) / 2) - rect.left;
+      const rawY = ((t1.clientY + t2.clientY) / 2) - rect.top;
 
       const xPct = Number(((rawX / rect.width) * 100).toFixed(1));
       const yPct = Number(((rawY / rect.height) * 100).toFixed(1));
