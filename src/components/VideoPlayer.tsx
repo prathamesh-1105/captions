@@ -108,12 +108,9 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     };
   }, []);
 
-  // Handle dragging caption block directly on video preview (double click and hold on desktop)
+  // Handle dragging caption block directly on video preview (standard click and drag on desktop)
   const handleCaptionDragStart = (e: React.MouseEvent) => {
     if (!activeCaption) return;
-    
-    // Only allow drag on double-click/double-tap and hold to prevent accidental movement
-    if (e.detail < 2) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -201,13 +198,14 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     document.addEventListener('mouseup', handleMouseUpRotate);
   };
 
-  // Handle dragging caption block via touch (mobile - two-finger pinch/drag)
+  // Handle dragging caption block via touch (mobile - standard drag)
   const handleCaptionTouchStart = (e: React.TouchEvent) => {
     if (!activeCaption) return;
     
-    // Only allow drag if exactly 2 fingers are touching to prevent conflicting with page scroll
-    if (e.touches.length !== 2) return;
-    
+    // Prevent screen scroll only while starting to drag the caption element
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     e.stopPropagation();
 
     const container = containerRef.current;
@@ -222,15 +220,17 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     const rect = container.getBoundingClientRect();
 
     const handleTouchMoveDrag = (moveEvent: TouchEvent) => {
-      // Only drag if exactly 2 fingers are still touching
-      if (moveEvent.touches.length !== 2) return;
+      if (moveEvent.touches.length === 0) return;
       
-      const t1 = moveEvent.touches[0];
-      const t2 = moveEvent.touches[1];
-      
-      // Calculate midpoint between two touch contacts
-      const rawX = ((t1.clientX + t2.clientX) / 2) - rect.left;
-      const rawY = ((t1.clientY + t2.clientY) / 2) - rect.top;
+      // Prevent browser scroll overlay during active drag interaction
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
+
+      // Support dragging using the first touch point
+      const touch = moveEvent.touches[0];
+      const rawX = touch.clientX - rect.left;
+      const rawY = touch.clientY - rect.top;
 
       const xPct = Number(((rawX / rect.width) * 100).toFixed(1));
       const yPct = Number(((rawY / rect.height) * 100).toFixed(1));
@@ -246,7 +246,8 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
       document.removeEventListener('touchend', handleTouchEndDrag);
     };
 
-    document.addEventListener('touchmove', handleTouchMoveDrag, { passive: true });
+    // Use passive: false to allow calling preventDefault() inside touchmove
+    document.addEventListener('touchmove', handleTouchMoveDrag, { passive: false });
     document.addEventListener('touchend', handleTouchEndDrag);
   };
 
@@ -383,7 +384,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
           style={getOverlayStyle()}
           onMouseDown={handleCaptionDragStart}
           onTouchStart={handleCaptionTouchStart}
-          className={`absolute pointer-events-auto transition-shadow ${
+          className={`absolute pointer-events-auto transition-shadow z-30 ${
             selectedCaptionId === activeCaption.id
               ? 'ring-2 ring-violet-500 ring-offset-2 ring-offset-black/50 rounded-lg p-1'
               : ''
