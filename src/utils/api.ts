@@ -3,11 +3,17 @@ export function getApiBase(): string {
   const saved = localStorage.getItem('backend_url');
   if (saved) return saved;
 
+  const hostname = window.location.hostname;
+  const isVercel = hostname.includes('vercel.app');
+
   // 2. Check if a build-time env variable is defined
   const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) return envUrl;
-
-  const hostname = window.location.hostname;
+  if (envUrl) {
+    const isEnvLocal = /localhost|127\.0\.0\.1|192\.168\.|10\.|172\./.test(envUrl);
+    if (!isVercel || !isEnvLocal) {
+      return envUrl;
+    }
+  }
 
   // 3. Local dev server
   if (hostname === 'localhost') {
