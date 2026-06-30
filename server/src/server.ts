@@ -5,19 +5,37 @@ import os from 'os';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import multer from 'multer';
-import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
-import { path as ffprobePath } from '@ffprobe-installer/ffprobe';
-import ffmpeg from 'fluent-ffmpeg';
 import { generateAssFile } from './utils/assGenerator';
 import { supabase } from './services/supabase';
 
 // Load environmental keys from root .env
 dotenv.config({ path: path.join(__dirname, '..', '..', '..', '.env') });
 
-// Set ffmpeg paths
-ffmpeg.setFfmpegPath(ffmpegPath);
-ffmpeg.setFfmpegPath(ffmpegPath);
-ffmpeg.setFfprobePath(ffprobePath);
+// Lazy FFmpeg / FFprobe loader
+let ffmpegInstance: any = null;
+function getFfmpeg() {
+  if (ffmpegInstance) return ffmpegInstance;
+  try {
+    const { path: ffmpegPath } = require('@ffmpeg-installer/ffmpeg');
+    const { path: ffprobePath } = require('@ffprobe-installer/ffprobe');
+    const fluentFfmpeg = require('fluent-ffmpeg');
+    fluentFfmpeg.setFfmpegPath(ffmpegPath);
+    fluentFfmpeg.setFfprobePath(ffprobePath);
+    ffmpegInstance = fluentFfmpeg;
+    return ffmpegInstance;
+  } catch (err) {
+    console.error('FFmpeg native modules lazy load failed:', err);
+    // Return mock interface so the server starts, but throws errors if client attempts video processing in cloud
+    const mockFfmpeg = (input: string) => {
+      throw new Error('FFmpeg video rendering is not supported in this serverless environment.');
+    };
+    mockFfmpeg.ffprobe = (p: string, cb: Function) => {
+      cb(new Error('FFprobe video analysis is not supported in this serverless environment.'));
+    };
+    ffmpegInstance = mockFfmpeg;
+    return ffmpegInstance;
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -104,7 +122,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
     console.log(`Video uploaded successfully to Supabase. Public URL: ${publicUrl}`);
 
     // Probe metadata using FFprobe
-    ffmpeg.ffprobe(videoPath, (err, metadata) => {
+    getFfmpeg().ffprobe(videoPath, (err: any, metadata: any) => {
       // Clean up the local temp upload file immediately
       try {
         if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
@@ -118,7 +136,7 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
       }
 
       const duration = metadata.format.duration || 0;
-      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
+      const videoStream = metadata.streams.find((s: any) => s.codec_type === 'video');
       const width = videoStream?.width || 1920;
       const height = videoStream?.height || 1080;
 
@@ -326,14 +344,14 @@ app.post('/api/export', async (req, res) => {
     await downloadFile(videoUrl, tempInputPath);
 
     // 3. Probe video properties to scale subtitle coordinates
-    ffmpeg.ffprobe(tempInputPath, async (probeErr, metadata) => {
+    getFfmpeg().ffprobe(tempInputPath, async (probeErr: any, metadata: any) => {
       if (probeErr) {
         cleanupTempFiles([tempInputPath]);
         return res.status(500).json({ error: 'Error probing downloaded video properties.' });
       }
 
-      const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-      const hasAudio = metadata.streams.some(s => s.codec_type === 'audio');
+      const videoStream = metadata.streams.find((s: any) => s.codec_type === 'video');
+      const hasAudio = metadata.streams.some((s: any) => s.codec_type === 'audio');
       const origWidth = videoStream?.width || 1920;
       const origHeight = videoStream?.height || 1080;
       const aspectRatio = origWidth / origHeight;
@@ -351,7 +369,7 @@ app.post('/api/export', async (req, res) => {
 
       console.log(`Running FFmpeg burn subtitles filter: ${resolution} @ ${fps}fps`);
 
-      const ffCommand = ffmpeg(tempInputPath)
+      const ffCommand = getFfmpeg()(tempInputPath)
         .videoFilters(videoFilters)
         .videoCodec('libx264');
 
@@ -411,7 +429,7 @@ app.post('/api/export', async (req, res) => {
             res.status(500).json({ error: uploadErr.message || 'Storage upload failed.' });
           }
         })
-        .on('error', (ffmpegErr) => {
+        .on('error', (ffmpegErr: any) => {
           console.error('FFmpeg processing error:', ffmpegErr);
           cleanupTempFiles([tempInputPath, assPath, tempOutputPath]);
           res.status(500).json({ error: 'FFmpeg encoding failed: ' + ffmpegErr.message });
