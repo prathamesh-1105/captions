@@ -121,34 +121,17 @@ app.post('/api/upload', upload.single('video'), async (req, res) => {
 
     console.log(`Video uploaded successfully to Supabase. Public URL: ${publicUrl}`);
 
-    // Probe metadata using FFprobe
-    getFfmpeg().ffprobe(videoPath, (err: any, metadata: any) => {
-      // Clean up the local temp upload file immediately
-      try {
-        if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
-      } catch (cleanupErr) {
-        console.error('Temp cleanup failed:', cleanupErr);
-      }
+    // Clean up the local temp upload file immediately
+    try {
+      if (fs.existsSync(videoPath)) fs.unlinkSync(videoPath);
+    } catch (cleanupErr) {
+      console.error('Temp cleanup failed:', cleanupErr);
+    }
 
-      if (err) {
-        console.error('Error probing video:', err);
-        return res.status(500).json({ error: 'Failed to read video metadata.' });
-      }
-
-      const duration = metadata.format.duration || 0;
-      const videoStream = metadata.streams.find((s: any) => s.codec_type === 'video');
-      const width = videoStream?.width || 1920;
-      const height = videoStream?.height || 1080;
-
-      res.json({
-        success: true,
-        filename,
-        videoUrl: publicUrl,
-        duration,
-        width,
-        height,
-        aspectRatio: width / height
-      });
+    res.json({
+      success: true,
+      filename,
+      videoUrl: publicUrl
     });
   } catch (err: any) {
     // Clean up local file on failure
