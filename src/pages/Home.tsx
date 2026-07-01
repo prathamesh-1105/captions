@@ -125,15 +125,27 @@ export default function Home({ onStart }: HomeProps) {
 
         if (supabase) {
           try {
-            setUploadProgress('Uploading video directly to Supabase storage (fast)...');
+            setUploadProgress('Requesting secure cloud upload signature...');
             bucketFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${videoFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-            
+
+            // Fetch signed upload URL and token from the backend
+            const signRes = await fetch(`${API_BASE}/api/signed-url`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: bucketFilename })
+            });
+
+            if (!signRes.ok) {
+              const signErr = await signRes.json();
+              throw new Error(signErr.error || 'Failed to sign the upload request.');
+            }
+
+            const { token } = await signRes.json();
+
+            setUploadProgress('Uploading video directly to Supabase storage (fast)...');
             const { error } = await supabase.storage
               .from('videos')
-              .upload(bucketFilename, videoFile, {
-                cacheControl: '3600',
-                upsert: true
-              });
+              .uploadToSignedUrl(bucketFilename, token, videoFile);
 
             if (error) throw error;
 
@@ -143,9 +155,9 @@ export default function Home({ onStart }: HomeProps) {
 
             videoUrl = urlData.publicUrl;
             uploaded = true;
-            console.log('Direct client-to-Supabase upload successful:', videoUrl);
+            console.log('Direct client-to-Supabase signed upload successful:', videoUrl);
           } catch (directError) {
-            console.warn('Direct upload failed or not permitted, falling back to server proxy...', directError);
+            console.warn('Signed direct upload failed, falling back to server proxy...', directError);
           }
         }
 

@@ -439,6 +439,34 @@ function cleanupTempFiles(filePaths: string[]) {
   });
 }
 
+// Endpoint 6: Generate Signed Upload URL for direct client-to-Supabase Storage uploads
+app.post('/api/signed-url', async (req, res) => {
+  const { filename } = req.body;
+  if (!filename) {
+    return res.status(400).json({ error: 'Filename is required.' });
+  }
+
+  try {
+    console.log(`Generating signed upload URL for filename: "${filename}"`);
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .createSignedUploadUrl(filename);
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      signedUrl: data.signedUrl,
+      token: data.token,
+      path: data.path
+    });
+  } catch (err: any) {
+    console.error('Failed to generate signed upload URL:', err);
+    res.status(500).json({ error: err.message || 'Failed to generate signed upload URL.' });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', time: new Date() });
