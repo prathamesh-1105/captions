@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import type { CaptionBlock, CaptionStyle } from '../types';
+import type { CaptionBlock, CaptionStyle, PresetType } from '../types';
+import { PRESETS } from '../utils/presets';
 import { formatPlayheadTime } from '../utils/timeline';
+
+const TRENDY_COLORS = [
+  '#FFFFFF', '#000000', '#FFFF00', '#39FF14', '#FF2A7A', '#00FFFF', '#FD1D1D', '#FF8C00', '#833AB4'
+];
 
 interface VideoPlayerProps {
   blobUrl: string;
@@ -82,6 +87,46 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
       localRef.current.muted = nextMuted;
       localRef.current.volume = nextMuted ? 0 : volume;
     }
+  };
+
+  const cycleBackgroundStyle = () => {
+    if (!onUpdateStyle) return;
+    if (style.backgroundOpacity === 0) {
+      // Move to Translucent Dark Box
+      onUpdateStyle({
+        backgroundOpacity: 0.5,
+        backgroundColor: '#000000',
+        textColor: style.textColor === '#000000' ? '#FFFFFF' : style.textColor
+      });
+    } else if (style.backgroundOpacity === 0.5 && style.backgroundColor === '#000000') {
+      // Move to Solid Yellow Box
+      onUpdateStyle({
+        backgroundOpacity: 0.9,
+        backgroundColor: '#FFFF00',
+        textColor: '#000000'
+      });
+    } else if (style.backgroundColor === '#FFFF00') {
+      // Move to Solid Neon Pink Box
+      onUpdateStyle({
+        backgroundOpacity: 0.9,
+        backgroundColor: '#FF2A7A',
+        textColor: '#FFFFFF'
+      });
+    } else {
+      // Back to No Background
+      onUpdateStyle({
+        backgroundOpacity: 0,
+        textColor: style.textColor === '#000000' ? '#FFFFFF' : style.textColor
+      });
+    }
+  };
+
+  const cycleAlignment = () => {
+    if (!onUpdateStyle) return;
+    const positions: ('top' | 'center' | 'bottom' | 'custom')[] = ['bottom', 'center', 'top'];
+    const currentIndex = positions.indexOf(style.position);
+    const nextIndex = (currentIndex + 1) % positions.length;
+    onUpdateStyle({ position: positions[nextIndex] });
   };
 
   // Find active caption
@@ -343,6 +388,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
       textShadow: textShadows.join(', ') || undefined,
       cursor: style.position === 'custom' ? 'move' : 'default',
       userSelect: 'none',
+      touchAction: 'none', // Critical: disables page scroll while dragging text on mobile
       ...posStyles
     };
   };
@@ -497,6 +543,77 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
               className="w-0 group-hover:w-16 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer transition-all duration-300 accent-violet-600 focus:outline-none"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Instagram Stories Style Quick Editor Toolbar (Visible on Mobile Only) */}
+      <div className="lg:hidden absolute bottom-14 inset-x-0 bg-zinc-950/90 backdrop-blur-md border-t border-white/5 p-3 flex flex-col gap-3 z-20 select-none">
+        {/* Row 1: Font Presets Carousel */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {(Object.keys(PRESETS) as PresetType[]).map((key) => {
+            const item = PRESETS[key];
+            const isSelected = style.fontFamily === item.style.fontFamily && style.textColor.toLowerCase() === item.style.textColor.toLowerCase();
+            return (
+              <button
+                key={key}
+                onClick={() => onUpdateStyle && onUpdateStyle({ ...item.style })}
+                className={`px-3 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap border transition-all ${
+                  isSelected
+                    ? 'bg-white text-black border-white shadow-lg'
+                    : 'bg-zinc-900/60 text-zinc-300 border-white/10 hover:text-white'
+                }`}
+                style={{ fontFamily: item.style.fontFamily }}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row 2: Actions & Colors */}
+        <div className="flex items-center justify-between gap-3">
+          {/* Left Action: Toggle background box style */}
+          <button
+            onClick={cycleBackgroundStyle}
+            className="p-2 rounded-lg bg-zinc-900/80 text-zinc-300 border border-white/10 hover:text-white flex items-center justify-center shrink-0"
+            title="Toggle Text Background (Insta Style)"
+          >
+            <span className="text-[10px] font-extrabold px-0.5 border border-current rounded leading-none">
+              A
+            </span>
+          </button>
+
+          {/* Center Column: Scrollable Color Dots */}
+          <div className="flex-1 flex items-center gap-2.5 overflow-x-auto py-1 scrollbar-none justify-start px-1">
+            {TRENDY_COLORS.map(color => {
+              const isSelected = style.textColor.toLowerCase() === color.toLowerCase();
+              return (
+                <button
+                  key={color}
+                  onClick={() => onUpdateStyle && onUpdateStyle({ textColor: color })}
+                  className={`w-5 h-5 rounded-full border transition-transform flex items-center justify-center shrink-0 ${
+                    isSelected ? 'scale-115 border-white' : 'border-white/15 hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: color }}
+                >
+                  {isSelected && (
+                    <div className={`w-1 h-1 rounded-full ${color === '#FFFFFF' ? 'bg-black' : 'bg-white'}`} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Right Action: Cycle Alignment */}
+          <button
+            onClick={cycleAlignment}
+            className="p-2 rounded-lg bg-zinc-900/80 text-zinc-300 border border-white/10 hover:text-white flex items-center justify-center shrink-0"
+            title="Cycle Alignment"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
