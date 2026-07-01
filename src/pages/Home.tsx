@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { distributeCaptions } from '../utils/timeline';
 import { getApiBase } from '../utils/api';
 import type { VideoMetadata, CaptionBlock } from '../types';
+import { supabase } from '../services/supabase';
 
 interface HomeProps {
   onStart: (file: File | null, metadata: VideoMetadata, captions: CaptionBlock[], id?: string) => void;
@@ -117,23 +118,56 @@ export default function Home({ onStart }: HomeProps) {
           blobUrl: localBlobUrl
         };
 
-        // 1. Upload video file to backend upload proxy endpoint
-        setUploadProgress('Uploading video to backend server...');
-        const formData = new FormData();
-        formData.append('video', videoFile);
+        // 1. Upload video file (Try direct Supabase upload first for speed, fallback to server proxy)
+        let videoUrl = '';
+        let bucketFilename = '';
+        let uploaded = false;
 
-        const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
-          method: 'POST',
-          body: formData
-        });
+        if (supabase) {
+          try {
+            setUploadProgress('Uploading video directly to Supabase storage (fast)...');
+            bucketFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${videoFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+            
+            const { error } = await supabase.storage
+              .from('videos')
+              .upload(bucketFilename, videoFile, {
+                cacheControl: '3600',
+                upsert: true
+              });
 
-        if (!uploadResponse.ok) {
-          const errResponse = await uploadResponse.json();
-          throw new Error(errResponse.error || 'Server rejected file upload.');
+            if (error) throw error;
+
+            const { data: urlData } = supabase.storage
+              .from('videos')
+              .getPublicUrl(bucketFilename);
+
+            videoUrl = urlData.publicUrl;
+            uploaded = true;
+            console.log('Direct client-to-Supabase upload successful:', videoUrl);
+          } catch (directError) {
+            console.warn('Direct upload failed or not permitted, falling back to server proxy...', directError);
+          }
         }
 
-        const uploadResult = await uploadResponse.json();
-        const { videoUrl, filename: bucketFilename } = uploadResult;
+        if (!uploaded) {
+          setUploadProgress('Uploading video to backend server (fallback)...');
+          const formData = new FormData();
+          formData.append('video', videoFile);
+
+          const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!uploadResponse.ok) {
+            const errResponse = await uploadResponse.json();
+            throw new Error(errResponse.error || 'Server rejected file upload.');
+          }
+
+          const uploadResult = await uploadResponse.json();
+          videoUrl = uploadResult.videoUrl;
+          bucketFilename = uploadResult.filename;
+        }
 
         // 2. Distribute captions evenly based on duration
         setUploadProgress('Analyzing script timelines...');
