@@ -91,6 +91,8 @@ export default function App() {
           <Export
             projectId={projectId}
             metadata={videoMetadata}
+            captions={captions}
+            style={style}
             resolution={resolution}
             fps={fps}
             onBack={() => setCurrentPage('editor')}

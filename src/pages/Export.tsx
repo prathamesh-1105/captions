@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { VideoMetadata } from '../types';
+import type { CaptionBlock, CaptionStyle, VideoMetadata } from '../types';
 import { getApiBase } from '../utils/api';
+import { generateAssFile } from '../utils/assGenerator';
 
 interface ExportProps {
   projectId: string | null;
   metadata: VideoMetadata;
+  captions: CaptionBlock[];
+  style: CaptionStyle;
   resolution: '720p' | '1080p' | '2k' | '4k';
   fps: number;
   onBack: () => void;
@@ -15,6 +18,9 @@ type ExportState = 'idle' | 'processing' | 'completed' | 'failed';
 
 export default function Export({
   projectId,
+  metadata,
+  captions,
+  style,
   resolution,
   fps,
   onBack,
@@ -24,6 +30,30 @@ export default function Export({
   const [status, setStatus] = useState<ExportState>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [downloadUrl, setDownloadUrl] = useState<string>('');
+
+  const handleDownloadAss = () => {
+    try {
+      const w = metadata.width || 1920;
+      const h = metadata.height || 1080;
+      const assContent = generateAssFile(captions, style, w, h);
+      
+      const blob = new Blob([assContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Clean name
+      const cleanName = (metadata.filename || 'subtitles').replace(/\.[^/.]+$/, "");
+      link.download = `${cleanName}.ass`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`Failed to export subtitle file: ${err.message}`);
+    }
+  };
 
   useEffect(() => {
     // Start export process automatically on mount
@@ -133,14 +163,28 @@ export default function Export({
               </svg>
             </div>
             <div className="space-y-1.5">
-              <p className="text-sm font-semibold text-red-200">Export Failed</p>
-              <p className="text-xs text-zinc-550 max-w-[280px] mx-auto leading-relaxed">{errorMessage}</p>
+              <p className="text-sm font-semibold text-red-200">Export Limitation / Error</p>
+              {errorMessage.includes('not supported in this serverless environment') || errorMessage.includes('Failed to read video metadata') || errorMessage.includes('FFmpeg') || errorMessage.includes('FFprobe') ? (
+                <p className="text-xs text-zinc-400 max-w-[290px] mx-auto leading-relaxed">
+                  Video rendering is not supported on the Vercel Cloud due to execution limits. To render the final video, connect to your desktop backend, or download your custom styled subtitles (.ass) below to use in CapCut, Premiere, or VLC!
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-500 max-w-[280px] mx-auto leading-relaxed">{errorMessage}</p>
+              )}
             </div>
+            
+            <button
+              onClick={handleDownloadAss}
+              className="block w-full py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-sm font-semibold rounded-xl hover:from-violet-500 hover:to-indigo-500 shadow-lg shadow-violet-500/20 text-white transition-all duration-300"
+            >
+              Download Subtitles (.ass)
+            </button>
+
             <button
               onClick={startExportProcess}
-              className="px-4 py-2 rounded bg-zinc-900 border border-white/10 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 transition-colors"
+              className="w-full py-2 rounded-xl bg-zinc-900 border border-white/10 text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-850 transition-all duration-300"
             >
-              Retry Export
+              Retry Video Render
             </button>
           </div>
         )}
