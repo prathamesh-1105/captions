@@ -85,7 +85,8 @@ export default function Export({
       
       const video = document.createElement('video');
       video.src = URL.createObjectURL(fileToRender);
-      video.muted = true;
+      video.muted = false; // Unmuted to ensure tracks are active in captureStream
+      video.volume = 0.02; // Very quiet so it is not annoying to the user
       video.playsInline = true;
       video.crossOrigin = 'anonymous';
 
@@ -102,30 +103,41 @@ export default function Export({
         throw new Error('Could not create Canvas 2D context.');
       }
 
-      // Audio capturing/mixing
-      let audioStream: MediaStream | null = null;
-      let audioContext: AudioContext | null = null;
-      try {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioContext = new AudioContextClass();
-        const source = audioContext.createMediaElementSource(video);
-        const dest = audioContext.createMediaStreamDestination();
-        source.connect(dest);
-        source.connect(audioContext.destination); // Mix back into audio outputs
-        audioStream = dest.stream;
-      } catch (audioErr) {
-        console.warn('Audio capture failed, exporting without audio:', audioErr);
-      }
-
       // Capture Canvas Stream at target FPS
       const canvasStream = (canvas as any).captureStream ? (canvas as any).captureStream(fps) : (canvas as any).mozCaptureStream(fps);
       const combinedStream = new MediaStream();
       canvasStream.getVideoTracks().forEach((track: any) => combinedStream.addTrack(track));
-      if (audioStream) {
-        audioStream.getAudioTracks().forEach((track: any) => combinedStream.addTrack(track));
+
+      // Audio capturing/mixing (First try direct captureStream, then fallback to Web Audio API)
+      let audioContext: AudioContext | null = null;
+      try {
+        const videoStream = (video as any).captureStream ? (video as any).captureStream() : (video as any).mozCaptureStream();
+        if (videoStream) {
+          const audioTracks = videoStream.getAudioTracks();
+          if (audioTracks && audioTracks.length > 0) {
+            console.log('Successfully captured audio track directly from video element stream.');
+            audioTracks.forEach((track: any) => combinedStream.addTrack(track));
+          } else {
+            throw new Error('No audio tracks found in captureStream');
+          }
+        }
+      } catch (err) {
+        console.warn('Direct audio track capture failed. Trying AudioContext fallback...', err);
+        try {
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          audioContext = new AudioContextClass();
+          const source = audioContext.createMediaElementSource(video);
+          const dest = audioContext.createMediaStreamDestination();
+          source.connect(dest);
+          source.connect(audioContext.destination);
+          const audioTracks = dest.stream.getAudioTracks();
+          audioTracks.forEach((track: any) => combinedStream.addTrack(track));
+        } catch (audioErr) {
+          console.warn('Audio capture fallbacks failed, exporting without audio:', audioErr);
+        }
       }
 
-      // Recorder Setup
+      // Recorder Setup (with high video bitrate for crystal clear quality)
       let mimeType = 'video/webm;codecs=vp9';
       if (!MediaRecorder.isTypeSupported(mimeType)) {
         mimeType = 'video/webm';
@@ -138,7 +150,13 @@ export default function Export({
       }
 
       const recorderChunks: Blob[] = [];
-      const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
+      const recorderOptions: MediaRecorderOptions = {
+        mimeType: mimeType || undefined,
+        videoBitsPerSecond: 8000000, // 8 Mbps for high quality video!
+        audioBitsPerSecond: 192000   // 192 kbps for clear sound
+      };
+      
+      const recorder = new MediaRecorder(combinedStream, recorderOptions);
       
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -168,10 +186,18 @@ export default function Export({
         const percent = Math.min(99, Math.round((currentTime / video.duration) * 100));
         setRenderProgress(percent);
 
-        animFrameId = requestAnimationFrame(drawFrame);
+        if ((video as any).requestVideoFrameCallback) {
+          (video as any).requestVideoFrameCallback(drawFrame);
+        } else {
+          animFrameId = requestAnimationFrame(drawFrame);
+        }
       };
 
-      drawFrame();
+      if ((video as any).requestVideoFrameCallback) {
+        (video as any).requestVideoFrameCallback(drawFrame);
+      } else {
+        animFrameId = requestAnimationFrame(drawFrame);
+      }
 
       await new Promise<void>((resolve) => {
         video.onended = () => {
