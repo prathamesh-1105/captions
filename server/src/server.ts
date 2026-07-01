@@ -266,6 +266,58 @@ app.post('/api/projects', async (req, res) => {
   }
 });
 
+// Endpoint 3.5: Delete Project & Remove Associated Storage Video (Bypassing RLS)
+app.delete('/api/projects/:id', async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: 'Project ID is required.' });
+  }
+
+  try {
+    console.log(`Bypassing RLS: Deleting project ID: ${id}`);
+    
+    // 1. Fetch project row to find the video filename
+    const { data: project, error: fetchError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      console.warn(`Could not find project row to delete: ${fetchError.message}`);
+    }
+
+    // 2. Delete the project row from the database
+    const { error: deleteError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+
+    // 3. Remove the video file from Supabase Storage to free up space
+    if (project && project.video_filename) {
+      console.log(`Bypassing RLS: Deleting video file from storage: ${project.video_filename}`);
+      const { error: storageError } = await supabase.storage
+        .from('videos')
+        .remove([project.video_filename]);
+
+      if (storageError) {
+        console.error(`Failed to delete raw video ${project.video_filename} from storage:`, storageError.message);
+      } else {
+        console.log(`Successfully deleted storage file: ${project.video_filename}`);
+      }
+    }
+
+    res.json({ success: true, message: 'Project and associated storage files deleted successfully.' });
+  } catch (err: any) {
+    console.error('Delete project failed:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete project.' });
+  }
+});
+
 // Endpoint 4: Export Video with burned subtitles from Supabase Database
 app.post('/api/export', async (req, res) => {
   const {

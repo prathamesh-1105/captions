@@ -55,6 +55,32 @@ export default function Home({ onStart }: HomeProps) {
     fetchInitialData();
   }, [API_BASE]);
 
+  const handleDeleteProject = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this project? This will permanently delete the project and free up its video storage space.");
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setUploadProgress('Deleting project files...');
+      
+      const response = await fetch(`${API_BASE}/api/projects/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to delete project.');
+      }
+
+      // Remove from state list
+      setRecentProjects(prev => prev.filter(p => p.id !== id));
+      setLoading(false);
+    } catch (err: any) {
+      setLoading(false);
+      alert(`Delete failed: ${err.message}`);
+    }
+  };
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       setVideoFile(acceptedFiles[0]);
@@ -494,11 +520,26 @@ Looking for a place to hide
                       </p>
                     </div>
 
-                    <button className="p-1.5 rounded bg-white/5 text-zinc-400 group-hover:bg-violet-600 group-hover:text-white transition-colors shrink-0">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteProject(project.id);
+                        }}
+                        className="p-1.5 rounded bg-red-950/20 text-red-400 border border-red-500/10 hover:bg-red-650 hover:text-white transition-colors shrink-0"
+                        title="Delete Project"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.34 9m-4.78 0L9 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-1.816c0-1.057-.707-1.913-1.686-1.945a48.12 48.12 0 0 0-3.326 0c-.98.032-1.686 1.077-1.686 2.137v1.816m7.5 0H9" />
+                        </svg>
+                      </button>
+
+                      <button className="p-1.5 rounded bg-white/5 text-zinc-400 group-hover:bg-violet-600 group-hover:text-white transition-colors shrink-0">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
