@@ -160,8 +160,19 @@ export default function Home({ onStart }: HomeProps) {
           });
 
           if (!uploadResponse.ok) {
-            const errResponse = await uploadResponse.json();
-            throw new Error(errResponse.error || 'Server rejected file upload.');
+            let errMsg = 'Server rejected file upload.';
+            try {
+              const errResponse = await uploadResponse.json();
+              errMsg = errResponse.error || errMsg;
+            } catch {
+              const textErr = await uploadResponse.text();
+              errMsg = textErr || errMsg;
+            }
+            // Add helpful Vercel-specific hint for large payloads
+            if (errMsg.includes('Request Entity Too Large') || uploadResponse.status === 413) {
+              errMsg = 'File is too large for the cloud server (Vercel limits server uploads to 4.5MB). Please enable direct Supabase storage uploads.';
+            }
+            throw new Error(errMsg);
           }
 
           const uploadResult = await uploadResponse.json();
