@@ -91,6 +91,7 @@ export default function App() {
           <Export
             projectId={projectId}
             metadata={videoMetadata}
+            videoFile={videoFile}
             captions={captions}
             style={style}
             resolution={resolution}

@@ -6,6 +6,7 @@ import { generateAssFile } from '../utils/assGenerator';
 interface ExportProps {
   projectId: string | null;
   metadata: VideoMetadata;
+  videoFile: File | null;
   captions: CaptionBlock[];
   style: CaptionStyle;
   resolution: '720p' | '1080p' | '2k' | '4k';
@@ -19,6 +20,7 @@ type ExportState = 'idle' | 'processing' | 'completed' | 'failed' | 'downloaded'
 export default function Export({
   projectId,
   metadata,
+  videoFile,
   captions,
   style,
   resolution,
@@ -30,6 +32,8 @@ export default function Export({
   const [status, setStatus] = useState<ExportState>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [downloadUrl, setDownloadUrl] = useState<string>('');
+  const [isClientRendering, setIsClientRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
 
   const handleDownloadAss = () => {
     try {
@@ -55,6 +59,165 @@ export default function Export({
       setStatus('downloaded');
     } catch (err: any) {
       alert(`Failed to export subtitle file: ${err.message}`);
+    }
+  };
+
+  const renderVideoInBrowser = async () => {
+    setIsClientRendering(true);
+    setStatus('processing');
+    setRenderProgress(0);
+    setErrorMessage('');
+
+    let fileToRender: Blob | null = videoFile;
+    
+    try {
+      if (!fileToRender) {
+        setErrorMessage('Downloading raw video from Supabase storage...');
+        const fetchUrl = metadata.blobUrl;
+        const res = await fetch(fetchUrl);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch raw video file. Status: ${res.statusText}`);
+        }
+        fileToRender = await res.blob();
+      }
+
+      setErrorMessage('Preparing browser video burner...');
+      
+      const video = document.createElement('video');
+      video.src = URL.createObjectURL(fileToRender);
+      video.muted = true;
+      video.playsInline = true;
+      video.crossOrigin = 'anonymous';
+
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error('Failed to load video metadata.'));
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || metadata.width || 1920;
+      canvas.height = video.videoHeight || metadata.height || 1080;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Could not create Canvas 2D context.');
+      }
+
+      // Audio capturing/mixing
+      let audioStream: MediaStream | null = null;
+      let audioContext: AudioContext | null = null;
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContext = new AudioContextClass();
+        const source = audioContext.createMediaElementSource(video);
+        const dest = audioContext.createMediaStreamDestination();
+        source.connect(dest);
+        source.connect(audioContext.destination); // Mix back into audio outputs
+        audioStream = dest.stream;
+      } catch (audioErr) {
+        console.warn('Audio capture failed, exporting without audio:', audioErr);
+      }
+
+      // Capture Canvas Stream at target FPS
+      const canvasStream = (canvas as any).captureStream ? (canvas as any).captureStream(fps) : (canvas as any).mozCaptureStream(fps);
+      const combinedStream = new MediaStream();
+      canvasStream.getVideoTracks().forEach((track: any) => combinedStream.addTrack(track));
+      if (audioStream) {
+        audioStream.getAudioTracks().forEach((track: any) => combinedStream.addTrack(track));
+      }
+
+      // Recorder Setup
+      let mimeType = 'video/webm;codecs=vp9';
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/mp4';
+      }
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = ''; // Default browser fallback
+      }
+
+      const recorderChunks: Blob[] = [];
+      const recorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : undefined);
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recorderChunks.push(e.data);
+        }
+      };
+
+      recorder.start();
+      await video.play();
+
+      let animFrameId: number;
+      
+      const drawFrame = () => {
+        if (video.paused || video.ended) return;
+
+        // 1. Draw video frame
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // 2. Find active caption
+        const currentTime = video.currentTime;
+        const activeCap = captions.find(c => currentTime >= c.start && currentTime <= c.end);
+        if (activeCap) {
+          drawTextOnCanvas(ctx, activeCap.text, style, canvas.width, canvas.height, activeCap.x, activeCap.y);
+        }
+
+        // 3. Update progress
+        const percent = Math.min(99, Math.round((currentTime / video.duration) * 100));
+        setRenderProgress(percent);
+
+        animFrameId = requestAnimationFrame(drawFrame);
+      };
+
+      drawFrame();
+
+      await new Promise<void>((resolve) => {
+        video.onended = () => {
+          cancelAnimationFrame(animFrameId);
+          recorder.stop();
+          resolve();
+        };
+        video.onerror = () => {
+          cancelAnimationFrame(animFrameId);
+          recorder.stop();
+          resolve();
+        };
+      });
+
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+      });
+
+      // Cleanup audio context if running
+      if (audioContext && audioContext.state !== 'closed') {
+        audioContext.close();
+      }
+
+      const finalMime = recorderChunks[0]?.type || 'video/mp4';
+      const finalBlob = new Blob(recorderChunks, { type: finalMime });
+      const finalUrl = URL.createObjectURL(finalBlob);
+
+      setDownloadUrl(finalUrl);
+      setRenderProgress(100);
+      setStatus('completed');
+      setIsClientRendering(false);
+
+      // Auto trigger download
+      const link = document.createElement('a');
+      link.href = finalUrl;
+      const cleanName = (metadata.filename || 'captioned-video').replace(/\.[^/.]+$/, "");
+      const ext = finalMime.includes('webm') ? 'webm' : 'mp4';
+      link.download = `${cleanName}-captioned.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (err: any) {
+      console.error('Client-side rendering failed:', err);
+      setIsClientRendering(false);
+      handleError(err.message || 'Client-side rendering failed.');
     }
   };
 
@@ -92,10 +255,12 @@ export default function Export({
         setDownloadUrl(result.downloadUrl);
         setStatus('completed');
       } else {
-        handleError(result.error || 'Server rendering failed.');
+        console.warn('Server render failed. Falling back to browser-side rendering...', result.error);
+        renderVideoInBrowser();
       }
     } catch (err: any) {
-      handleError(err.message || 'Error communicating with rendering server.');
+      console.warn('Error communicating with server. Falling back to browser-side rendering...', err.message);
+      renderVideoInBrowser();
     }
   };
 
@@ -128,8 +293,27 @@ export default function Export({
               </svg>
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-zinc-200">Burning Captions onto Video</p>
-              <p className="text-xs text-zinc-550">FFmpeg is downloading the video from Supabase, applying subtitle presets, and encoding overlays. Please wait.</p>
+              <p className="text-sm font-semibold text-zinc-200">
+                {isClientRendering ? 'Offline Browser Burning in Progress' : 'Burning Captions onto Video'}
+              </p>
+              <p className="text-xs text-zinc-550 max-w-[320px] mx-auto leading-relaxed">
+                {isClientRendering 
+                  ? 'Your browser is drawing styled caption presets and recording frame by frame. Do not close this tab.' 
+                  : 'FFmpeg is downloading the video from Supabase, applying subtitle presets, and encoding overlays. Please wait.'
+                }
+              </p>
+              
+              {isClientRendering && (
+                <div className="w-full max-w-xs mx-auto pt-2">
+                  <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-white/5">
+                    <div 
+                      className="bg-gradient-to-r from-violet-500 to-indigo-500 h-full transition-all duration-300"
+                      style={{ width: `${renderProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-zinc-400 font-mono mt-1">{renderProgress}% completed</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -240,4 +424,82 @@ export default function Export({
       </div>
     </div>
   );
+}
+
+function drawTextOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  style: CaptionStyle,
+  width: number,
+  height: number,
+  capX?: number,
+  capY?: number
+) {
+  ctx.save();
+  const displayText = style.uppercase ? text.toUpperCase() : text;
+  const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
+  const scale = height / 1080;
+  const fontSize = Math.round(style.fontSize * scale);
+  ctx.font = `${weight} ${fontSize}px ${style.fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  let x = width / 2;
+  let y = height * 0.9;
+
+  if (style.position === 'top') {
+    y = height * 0.15;
+  } else if (style.position === 'center') {
+    y = height / 2;
+  } else if (style.position === 'custom' && capX !== undefined && capY !== undefined) {
+    x = (capX / 100) * width;
+    y = (capY / 100) * height;
+  }
+
+  const lines = displayText.split('\n');
+  const lineHeight = fontSize * 1.25;
+  const startY = y - ((lines.length - 1) * lineHeight) / 2;
+
+  lines.forEach((line, index) => {
+    const currentY = startY + index * lineHeight;
+
+    if (style.backgroundOpacity > 0) {
+      const textWidth = ctx.measureText(line).width;
+      const paddingX = fontSize * 0.4;
+      const paddingY = fontSize * 0.2;
+      ctx.fillStyle = hexToRgba(style.backgroundColor, style.backgroundOpacity * style.opacity);
+      ctx.fillRect(
+        x - textWidth / 2 - paddingX,
+        currentY - fontSize / 2 - paddingY,
+        textWidth + paddingX * 2,
+        fontSize + paddingY * 2
+      );
+    }
+
+    if (style.strokeWidth > 0) {
+      ctx.strokeStyle = hexToRgba(style.strokeColor, style.opacity);
+      ctx.lineWidth = style.strokeWidth * 2 * scale;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(line, x, currentY);
+    }
+
+    ctx.fillStyle = hexToRgba(style.textColor, style.textOpacity * style.opacity);
+    ctx.fillText(line, x, currentY);
+  });
+
+  ctx.restore();
+}
+
+function hexToRgba(hex: string, alpha: number = 1): string {
+  let cleanHex = hex.replace('#', '');
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
+  }
+  if (cleanHex.length !== 6) {
+    cleanHex = 'FFFFFF';
+  }
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
