@@ -14,8 +14,8 @@ export default function App() {
   const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
   const [captions, setCaptions] = useState<CaptionBlock[]>([]);
   
-  // Default to Modern White style preset
-  const [style, setStyle] = useState<CaptionStyle>({ ...PRESETS['modern-white'].style });
+  // Default to clean style preset
+  const [style, setStyle] = useState<CaptionStyle>({ ...PRESETS['default'].style });
 
   // Export options
   const [resolution, setResolution] = useState<'720p' | '1080p' | '2k' | '4k'>('1080p');
@@ -30,7 +30,7 @@ export default function App() {
     setVideoFile(null);
     setVideoMetadata(null);
     setCaptions([]);
-    setStyle({ ...PRESETS['modern-white'].style });
+    setStyle({ ...PRESETS['default'].style });
     setCurrentPage('home');
   };
 

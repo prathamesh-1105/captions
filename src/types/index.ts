@@ -28,24 +28,7 @@ export interface CaptionStyle {
   position: 'top' | 'center' | 'bottom' | 'custom';
 }
 
-export type PresetType =
-  | 'modern-white'
-  | 'bold-tiktok'
-  | 'minimal'
-  | 'netflix'
-  | 'cinematic'
-  | 'soft-shadow'
-  | 'neon'
-  | 'luxury'
-  | 'apple'
-  | 'floating'
-  | 'yellow-pop'
-  | 'insta-gradient'
-  | 'cyberpunk'
-  | 'aesthetic-vlog'
-  | 'insta-yellow'
-  | 'insta-white'
-  | 'insta-squeeze';
+export type PresetType = 'default';
 
 export interface VideoMetadata {
   filename: string;

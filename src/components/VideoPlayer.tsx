@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import type { CaptionBlock, CaptionStyle, PresetType } from '../types';
-import { PRESETS } from '../utils/presets';
+import type { CaptionBlock, CaptionStyle } from '../types';
 import { formatPlayheadTime } from '../utils/timeline';
 
 const TRENDY_COLORS = [
@@ -548,27 +547,6 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
 
       {/* Instagram Stories Style Quick Editor Toolbar (Visible on Mobile Only) */}
       <div className="lg:hidden absolute bottom-14 inset-x-0 bg-zinc-950/90 backdrop-blur-md border-t border-white/5 p-3 flex flex-col gap-3 z-20 select-none">
-        {/* Row 1: Font Presets Carousel */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {(Object.keys(PRESETS) as PresetType[]).map((key) => {
-            const item = PRESETS[key];
-            const isSelected = style.fontFamily === item.style.fontFamily && style.textColor.toLowerCase() === item.style.textColor.toLowerCase();
-            return (
-              <button
-                key={key}
-                onClick={() => onUpdateStyle && onUpdateStyle({ ...item.style })}
-                className={`px-3 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap border transition-all ${
-                  isSelected
-                    ? 'bg-white text-black border-white shadow-lg'
-                    : 'bg-zinc-900/60 text-zinc-300 border-white/10 hover:text-white'
-                }`}
-                style={{ fontFamily: item.style.fontFamily }}
-              >
-                {item.name}
-              </button>
-            );
-          })}
-        </div>
 
         {/* Row 2: Actions & Colors */}
         <div className="flex items-center justify-between gap-3">
