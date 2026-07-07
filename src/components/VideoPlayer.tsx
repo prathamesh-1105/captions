@@ -42,7 +42,6 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
   const [showControls, setShowControls] = useState<boolean>(true);
   const [rotationAngle, setRotationAngle] = useState<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
-  const fisheyeCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Sync internal ref with forwarded ref
   useImperativeHandle(ref, () => localRef.current!);
@@ -136,97 +135,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
     c => currentTime >= c.start && currentTime <= c.end
   );
 
-  // Real-time Fish-Eye effect drawing on canvas
-  useEffect(() => {
-    const canvas = fisheyeCanvasRef.current;
-    if (!canvas || !activeCaption || style.animation !== 'fisheye') return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const text = style.uppercase ? activeCaption.text.toUpperCase() : activeCaption.text;
-    const fontSize = style.fontSize;
-    const fontFamily = style.fontFamily;
-    const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
-
-    // Set font to measure dimensions
-    ctx.font = `italic ${weight} ${fontSize}px ${fontFamily}`;
-    const metrics = ctx.measureText(text);
-    const textWidth = metrics.width;
-    const textHeight = fontSize * 1.45;
-
-    const padding = 40;
-    const W = textWidth + padding;
-    const H = textHeight + padding;
-
-    // Set canvas dimensions (with extra horizontal spacing for stretching)
-    canvas.width = Math.round(W * 1.45);
-    canvas.height = Math.round(H * 1.25);
-
-    // Clear target canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Create offscreen canvas to paint flat text first
-    const offscreen = document.createElement('canvas');
-    offscreen.width = W;
-    offscreen.height = H;
-    const oCtx = offscreen.getContext('2d');
-    if (!oCtx) return;
-
-    oCtx.font = `italic ${weight} ${fontSize}px ${fontFamily}`;
-    oCtx.textAlign = 'center';
-    oCtx.textBaseline = 'middle';
-
-    const oCenterX = W / 2;
-    const oCenterY = H / 2;
-
-    // Draw shadow if configured
-    if (style.shadowWidth > 0) {
-      oCtx.shadowColor = style.shadowColor;
-      oCtx.shadowBlur = style.shadowWidth;
-      oCtx.shadowOffsetX = style.shadowWidth / 2;
-      oCtx.shadowOffsetY = style.shadowWidth / 2;
-    }
-
-    // Draw stroke
-    if (style.strokeWidth > 0) {
-      oCtx.strokeStyle = style.strokeColor;
-      oCtx.lineWidth = style.strokeWidth;
-      oCtx.lineJoin = 'round';
-      oCtx.strokeText(text, oCenterX, oCenterY);
-    }
-
-    // Reset shadow for main text fill
-    oCtx.shadowColor = 'transparent';
-    oCtx.shadowBlur = 0;
-    oCtx.shadowOffsetX = 0;
-    oCtx.shadowOffsetY = 0;
-
-    oCtx.fillStyle = style.textColor;
-    oCtx.fillText(text, oCenterX, oCenterY);
-
-    // Render warped slices
-    const destCenterX = canvas.width / 2;
-    const destCenterY = canvas.height / 2;
-
-    for (let sy = 0; sy < H; sy++) {
-      const yOffset = sy - H / 2;
-      const v = yOffset / (H / 2); // -1 to 1 range
-      const cosFactor = Math.cos(v * Math.PI / 2);
-      
-      const scaleX = 1.0 + 0.35 * cosFactor;
-      const scaleY = 1.0 + 0.15 * cosFactor;
-
-      const destW = W * scaleX;
-      const destH = 1.5; // slight overlap to prevent scanlines
-
-      const warpedYOffset = yOffset * scaleY;
-      const destX = destCenterX - destW / 2;
-      const destY = destCenterY + warpedYOffset - 0.5;
-
-      ctx.drawImage(offscreen, 0, sy, W, 1, destX, destY, destW, destH);
-    }
-  }, [activeCaption, style]);
 
   // Mouse move over container to show/hide controls
   const handleMouseMove = () => {
@@ -473,6 +382,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
 
     return {
       fontFamily: style.fontFamily,
+      fontStyle: style.animation === 'fisheye' ? 'italic' : 'normal',
       fontSize: `${style.fontSize}px`,
       fontWeight: style.fontWeight,
       textTransform: style.uppercase ? 'uppercase' : 'none',
@@ -552,23 +462,15 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
             </div>
           )}
 
-          {style.animation === 'fisheye' ? (
-            <canvas
-              ref={fisheyeCanvasRef}
-              className="max-w-full block"
-              style={{
-                transform: 'translate(-15%, -10%)', // align the larger canvas center with the overlay container
-              }}
-            />
-          ) : style.backgroundOpacity > 0 ? (
+          {style.backgroundOpacity > 0 ? (
             <span 
               style={getBackgroundStyle()}
-              className={style.animation !== 'none' ? `animate-${style.animation}` : ''}
+              className={style.animation !== 'none' && style.animation !== 'fisheye' ? `animate-${style.animation}` : ''}
             >
               {activeCaption.text}
             </span>
           ) : (
-            <span className={style.animation !== 'none' ? `animate-${style.animation}` : ''}>
+            <span className={style.animation !== 'none' && style.animation !== 'fisheye' ? `animate-${style.animation}` : ''}>
               {activeCaption.text}
             </span>
           )}

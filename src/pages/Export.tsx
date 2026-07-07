@@ -466,7 +466,8 @@ function drawTextOnCanvas(
   const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
   const scale = height / 1080;
   const fontSize = Math.round(style.fontSize * scale);
-  ctx.font = `${weight} ${fontSize}px ${style.fontFamily}`;
+  const italicPrefix = style.animation === 'fisheye' ? 'italic ' : '';
+  ctx.font = `${italicPrefix}${weight} ${fontSize}px ${style.fontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -486,68 +487,7 @@ function drawTextOnCanvas(
   const lineHeight = fontSize * 1.25;
   const startY = y - ((lines.length - 1) * lineHeight) / 2;
 
-  if (style.animation === 'fisheye') {
-    lines.forEach((line, index) => {
-      const currentY = startY + index * lineHeight;
-      const textFont = `italic ${weight} ${fontSize}px ${style.fontFamily}`;
-      ctx.font = textFont;
-      
-      const metrics = ctx.measureText(line);
-      const textWidth = metrics.width;
-      const textHeight = fontSize * 1.45;
 
-      const padding = 40;
-      const W = textWidth + padding;
-      const H = textHeight + padding;
-
-      // Draw normal flat text to an offscreen canvas first
-      const offscreen = document.createElement('canvas');
-      offscreen.width = W;
-      offscreen.height = H;
-      const oCtx = offscreen.getContext('2d');
-      if (!oCtx) return;
-
-      oCtx.font = textFont;
-      oCtx.textAlign = 'center';
-      oCtx.textBaseline = 'middle';
-      const oCenterX = W / 2;
-      const oCenterY = H / 2;
-
-      // Stroke if configured
-      if (style.strokeWidth > 0) {
-        oCtx.strokeStyle = hexToRgba(style.strokeColor, style.opacity);
-        oCtx.lineWidth = style.strokeWidth * 2 * scale;
-        oCtx.lineJoin = 'round';
-        oCtx.strokeText(line, oCenterX, oCenterY);
-      }
-
-      // Fill text
-      oCtx.fillStyle = hexToRgba(style.textColor, style.textOpacity * style.opacity);
-      oCtx.fillText(line, oCenterX, oCenterY);
-
-      // Slices projection loop for bulging warp
-      for (let sy = 0; sy < H; sy++) {
-        const yOffset = sy - H / 2;
-        const v = yOffset / (H / 2); // -1 to 1
-        const cosFactor = Math.cos(v * Math.PI / 2);
-        
-        const scaleX = 1.0 + 0.35 * cosFactor;
-        const scaleY = 1.0 + 0.15 * cosFactor;
-
-        const destW = W * scaleX;
-        const destH = 1.5;
-
-        const warpedYOffset = yOffset * scaleY;
-        const destX = x - destW / 2;
-        const destY = currentY + warpedYOffset - 0.5;
-
-        ctx.drawImage(offscreen, 0, sy, W, 1, destX, destY, destW, destH);
-      }
-    });
-
-    ctx.restore();
-    return;
-  }
 
   lines.forEach((line, index) => {
     const currentY = startY + index * lineHeight;
