@@ -42,6 +42,7 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
   const [showControls, setShowControls] = useState<boolean>(true);
   const [rotationAngle, setRotationAngle] = useState<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
+  const fisheyeCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Sync internal ref with forwarded ref
   useImperativeHandle(ref, () => localRef.current!);
@@ -134,6 +135,124 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
   const activeCaption = captions.find(
     c => currentTime >= c.start && currentTime <= c.end
   );
+
+  const drawFisheyeTextCharacterByCharacter = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    centerX: number,
+    centerY: number,
+    style: any,
+    scale: number = 1
+  ) => {
+    const fontSize = style.fontSize * scale;
+    const fontFamily = style.fontFamily;
+    const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
+
+    ctx.save();
+    ctx.font = `italic ${weight} ${fontSize}px ${fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const lines = text.split('\n');
+    const lineHeight = fontSize * 1.35;
+    const startY = centerY - ((lines.length - 1) * lineHeight) / 2;
+
+    lines.forEach((line, lineIndex) => {
+      const currentLineY = startY + lineIndex * lineHeight;
+      const lineYOffset = currentLineY - centerY;
+
+      const chars = line.split('');
+      if (chars.length === 0) return;
+
+      // Measure character widths
+      const charWidths = chars.map(c => ctx.measureText(c).width);
+      const totalLineWidth = charWidths.reduce((a, b) => a + b, 0);
+
+      let currentX = centerX - totalLineWidth / 2;
+
+      chars.forEach((char, charIndex) => {
+        const charWidth = charWidths[charIndex];
+        const charCenterX = currentX + charWidth / 2;
+        const xOffsetFromCenter = charCenterX - centerX;
+
+        const normX = xOffsetFromCenter / (totalLineWidth / 2 || 1);
+        const cosFactorX = Math.cos(normX * Math.PI / 3);
+
+        // Spherical bulge inward arching towards horizontal equator at sides
+        const archFactor = -lineYOffset * 0.35;
+        const archY = archFactor * (1.0 - Math.cos(normX * Math.PI / 2.5));
+
+        // Outward radiation tilt/rotation (left tilts left, right tilts right)
+        // Tilts more the further the character is from the equator and center
+        const tiltAngle = (xOffsetFromCenter / 200) * (Math.abs(lineYOffset) / 100) * 0.75;
+
+        ctx.save();
+        const finalX = charCenterX;
+        const finalY = currentLineY + archY;
+        ctx.translate(finalX, finalY);
+        ctx.rotate(tiltAngle);
+
+        // Scale character slightly larger in the center of the line
+        const scaleFactor = 1.0 + 0.25 * cosFactorX * (1.0 - Math.abs(lineYOffset) / 600);
+        ctx.scale(scaleFactor, scaleFactor);
+
+        // Draw stroke
+        if (style.strokeWidth > 0) {
+          ctx.strokeStyle = style.strokeColor;
+          ctx.lineWidth = style.strokeWidth * scale;
+          ctx.lineJoin = 'round';
+          ctx.strokeText(char, 0, 0);
+        }
+
+        // Draw fill
+        ctx.fillStyle = style.textColor;
+        ctx.fillText(char, 0, 0);
+
+        ctx.restore();
+
+        currentX += charWidth;
+      });
+    });
+    ctx.restore();
+  };
+
+  // Real-time Fish-Eye effect drawing on canvas
+  useEffect(() => {
+    const canvas = fisheyeCanvasRef.current;
+    if (!canvas || !activeCaption || style.animation !== 'fisheye') return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const text = style.uppercase ? activeCaption.text.toUpperCase() : activeCaption.text;
+    const fontSize = style.fontSize;
+    const fontFamily = style.fontFamily;
+    const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
+
+    // Set font to measure dimensions
+    ctx.font = `italic ${weight} ${fontSize}px ${fontFamily}`;
+    
+    // Estimate size
+    const lines = text.split('\n');
+    let maxWidth = 0;
+    lines.forEach(l => {
+      const w = ctx.measureText(l).width;
+      if (w > maxWidth) maxWidth = w;
+    });
+
+    const W = maxWidth + 120;
+    const H = (fontSize * 1.45) * lines.length + 100;
+
+    canvas.width = W;
+    canvas.height = H;
+
+    // Clear target canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = style.textOpacity * style.opacity;
+
+    // Call our character-by-character drawing helper
+    drawFisheyeTextCharacterByCharacter(ctx, text, W / 2, H / 2, style, 1);
+  }, [activeCaption, style]);
 
 
 
@@ -462,15 +581,23 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
             </div>
           )}
 
-          {style.backgroundOpacity > 0 ? (
+          {style.animation === 'fisheye' ? (
+            <canvas
+              ref={fisheyeCanvasRef}
+              className="max-w-full block"
+              style={{
+                transform: 'translate(-12%, -8%)', // align the larger canvas center with the overlay container
+              }}
+            />
+          ) : style.backgroundOpacity > 0 ? (
             <span 
               style={getBackgroundStyle()}
-              className={style.animation !== 'none' && style.animation !== 'fisheye' ? `animate-${style.animation}` : ''}
+              className={style.animation !== 'none' ? `animate-${style.animation}` : ''}
             >
               {activeCaption.text}
             </span>
           ) : (
-            <span className={style.animation !== 'none' && style.animation !== 'fisheye' ? `animate-${style.animation}` : ''}>
+            <span className={style.animation !== 'none' ? `animate-${style.animation}` : ''}>
               {activeCaption.text}
             </span>
           )}

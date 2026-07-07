@@ -452,6 +452,86 @@ export default function Export({
   );
 }
 
+function drawFisheyeTextCharacterByCharacter(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  centerY: number,
+  style: CaptionStyle,
+  scale: number = 1
+) {
+  const fontSize = style.fontSize * scale;
+  const fontFamily = style.fontFamily;
+  const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
+
+  ctx.save();
+  ctx.font = `italic ${weight} ${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const lines = text.split('\n');
+  const lineHeight = fontSize * 1.35;
+  const startY = centerY - ((lines.length - 1) * lineHeight) / 2;
+
+  lines.forEach((line, lineIndex) => {
+    const currentLineY = startY + lineIndex * lineHeight;
+    const lineYOffset = currentLineY - centerY;
+
+    const chars = line.split('');
+    if (chars.length === 0) return;
+
+    // Measure character widths
+    const charWidths = chars.map(c => ctx.measureText(c).width);
+    const totalLineWidth = charWidths.reduce((a, b) => a + b, 0);
+
+    let currentX = centerX - totalLineWidth / 2;
+
+    chars.forEach((char, charIndex) => {
+      const charWidth = charWidths[charIndex];
+      const charCenterX = currentX + charWidth / 2;
+      const xOffsetFromCenter = charCenterX - centerX;
+
+      const normX = xOffsetFromCenter / (totalLineWidth / 2 || 1);
+      const cosFactorX = Math.cos(normX * Math.PI / 3);
+
+      // Spherical bulge inward arching towards horizontal equator at sides
+      const archFactor = -lineYOffset * 0.35;
+      const archY = archFactor * (1.0 - Math.cos(normX * Math.PI / 2.5));
+
+      // Outward radiation tilt/rotation (left tilts left, right tilts right)
+      // Tilts more the further the character is from the equator and center
+      const tiltAngle = (xOffsetFromCenter / 200) * (Math.abs(lineYOffset) / 100) * 0.75;
+
+      ctx.save();
+      const finalX = charCenterX;
+      const finalY = currentLineY + archY;
+      ctx.translate(finalX, finalY);
+      ctx.rotate(tiltAngle);
+
+      // Scale character slightly larger in the center of the line
+      const scaleFactor = 1.0 + 0.25 * cosFactorX * (1.0 - Math.abs(lineYOffset) / 600);
+      ctx.scale(scaleFactor, scaleFactor);
+
+      // Draw stroke
+      if (style.strokeWidth > 0) {
+        ctx.strokeStyle = hexToRgba(style.strokeColor, style.opacity);
+        ctx.lineWidth = style.strokeWidth * 2 * scale;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(char, 0, 0);
+      }
+
+      // Draw fill
+      ctx.fillStyle = hexToRgba(style.textColor, style.textOpacity * style.opacity);
+      ctx.fillText(char, 0, 0);
+
+      ctx.restore();
+
+      currentX += charWidth;
+    });
+  });
+  ctx.restore();
+}
+
 function drawTextOnCanvas(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -466,10 +546,6 @@ function drawTextOnCanvas(
   const weight = style.fontWeight === 'bold' ? 'bold' : 'normal';
   const scale = height / 1080;
   const fontSize = Math.round(style.fontSize * scale);
-  const italicPrefix = style.animation === 'fisheye' ? 'italic ' : '';
-  ctx.font = `${italicPrefix}${weight} ${fontSize}px ${style.fontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
 
   let x = width / 2;
   let y = height * 0.9;
@@ -482,6 +558,18 @@ function drawTextOnCanvas(
     x = (capX / 100) * width;
     y = (capY / 100) * height;
   }
+
+  if (style.animation === 'fisheye') {
+    drawFisheyeTextCharacterByCharacter(ctx, displayText, x, y, style, scale);
+    ctx.restore();
+    return;
+  }
+
+  ctx.font = `${weight} ${fontSize}px ${style.fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+
 
   const lines = displayText.split('\n');
   const lineHeight = fontSize * 1.25;
