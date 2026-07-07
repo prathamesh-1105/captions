@@ -24,7 +24,7 @@ export interface CaptionStyle {
   glowColor?: string;     // #RRGGBB
   glowWidth?: number;     // 0-10
   opacity: number;        // 0-1
-  animation: 'none' | 'fade' | 'slide-up' | 'pop' | 'scale' | 'squeeze';
+  animation: 'none' | 'fade' | 'slide-up' | 'pop' | 'scale' | 'squeeze' | 'fisheye';
   position: 'top' | 'center' | 'bottom' | 'custom';
 }
 
@@ -33,7 +33,8 @@ export type PresetType =
   | 'bold-clean'
   | 'condensed-uppercase'
   | 'typewriter-bold'
-  | 'sans-thin';
+  | 'sans-thin'
+  | 'fisheye';
 
 export interface VideoMetadata {
   filename: string;

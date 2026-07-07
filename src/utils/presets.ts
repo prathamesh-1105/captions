@@ -101,4 +101,24 @@ export const PRESETS: Record<PresetType, { name: string; style: CaptionStyle }> 
       position: 'bottom',
     },
   },
+  'fisheye': {
+    name: 'Fish Eye Italic',
+    style: {
+      fontFamily: 'Playfair Display',
+      fontSize: 34,
+      fontWeight: 'bold',
+      uppercase: false,
+      textColor: '#FFFF00', // Yellow
+      textOpacity: 1,
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      strokeColor: '#000000',
+      strokeWidth: 2,
+      shadowColor: '#000000',
+      shadowWidth: 0,
+      opacity: 1,
+      animation: 'fisheye', // triggers 3D fish-eye bulge renderer
+      position: 'bottom',
+    },
+  },
 };
