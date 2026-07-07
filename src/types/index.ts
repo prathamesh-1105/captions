@@ -28,7 +28,12 @@ export interface CaptionStyle {
   position: 'top' | 'center' | 'bottom' | 'custom';
 }
 
-export type PresetType = 'default';
+export type PresetType =
+  | 'condensed-yellow'
+  | 'bold-clean'
+  | 'condensed-uppercase'
+  | 'typewriter-bold'
+  | 'sans-thin';
 
 export interface VideoMetadata {
   filename: string;

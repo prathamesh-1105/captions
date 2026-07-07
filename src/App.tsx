@@ -15,7 +15,7 @@ export default function App() {
   const [captions, setCaptions] = useState<CaptionBlock[]>([]);
   
   // Default to clean style preset
-  const [style, setStyle] = useState<CaptionStyle>({ ...PRESETS['default'].style });
+  const [style, setStyle] = useState<CaptionStyle>({ ...PRESETS['bold-clean'].style });
 
   // Export options
   const [resolution, setResolution] = useState<'720p' | '1080p' | '2k' | '4k'>('1080p');
@@ -30,7 +30,7 @@ export default function App() {
     setVideoFile(null);
     setVideoMetadata(null);
     setCaptions([]);
-    setStyle({ ...PRESETS['default'].style });
+    setStyle({ ...PRESETS['bold-clean'].style });
     setCurrentPage('home');
   };
 

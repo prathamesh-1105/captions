@@ -3,6 +3,7 @@ import type { CaptionBlock, CaptionStyle, VideoMetadata } from '../types';
 import VideoPlayer from '../components/VideoPlayer';
 import Timeline from '../components/Timeline';
 import StyleCustomizer from '../components/StyleCustomizer';
+import PresetList from '../components/PresetList';
 import { getApiBase } from '../utils/api';
 
 interface EditorProps {
@@ -278,8 +279,26 @@ export default function Editor({
         {/* Right Side: Styling and Presets Toolbar */}
         <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-white/10 flex flex-col bg-zinc-950 shrink-0 min-h-0 lg:h-full hidden lg:flex">
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            
-
+            {/* Gallery of Presets */}
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mb-3">Style Presets</h3>
+              <PresetList
+                currentStyle={style}
+                onSelectPreset={(presetStyle) => {
+                  setStyle(prev => ({
+                    ...prev,
+                    fontFamily: presetStyle.fontFamily,
+                    fontSize: presetStyle.fontSize,
+                    fontWeight: presetStyle.fontWeight,
+                    uppercase: presetStyle.uppercase,
+                    textColor: presetStyle.textColor,
+                    textOpacity: presetStyle.textOpacity,
+                    animation: presetStyle.animation,
+                    position: presetStyle.position === 'custom' ? prev.position : presetStyle.position
+                  }));
+                }}
+              />
+            </div>
 
             {/* Customizer properties */}
             <div className="border-t border-white/5 pt-4">
