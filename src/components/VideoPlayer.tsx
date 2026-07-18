@@ -735,6 +735,24 @@ const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({
             })}
           </div>
 
+          {/* Size Decrease */}
+          <button
+            onClick={() => onUpdateStyle && onUpdateStyle({ fontSize: Math.max(12, style.fontSize - 2) })}
+            className="w-8 h-8 rounded-lg bg-zinc-900/80 text-zinc-300 border border-white/10 hover:text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform font-bold text-xs"
+            title="Decrease Text Size"
+          >
+            a-
+          </button>
+
+          {/* Size Increase */}
+          <button
+            onClick={() => onUpdateStyle && onUpdateStyle({ fontSize: Math.min(80, style.fontSize + 2) })}
+            className="w-8 h-8 rounded-lg bg-zinc-900/80 text-zinc-300 border border-white/10 hover:text-white flex items-center justify-center shrink-0 active:scale-90 transition-transform font-bold text-sm"
+            title="Increase Text Size"
+          >
+            A+
+          </button>
+
           {/* Right Action: Cycle Alignment */}
           <button
             onClick={cycleAlignment}
