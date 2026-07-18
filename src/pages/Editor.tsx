@@ -204,7 +204,7 @@ export default function Editor({
         {/* Left Side: Video Preview Column */}
         <div className="flex flex-col p-4 gap-4 min-w-0 bg-zinc-950/40 lg:flex-1 lg:h-full lg:min-h-0 flex-1 min-h-0">
           {/* Action Toolbar */}
-          <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2">
+          <div className="h-10 flex items-center justify-between border-b border-white/5 pb-2 shrink-0">
             <div className="flex items-center gap-2 sm:gap-3 text-xs text-zinc-450">
               <span className="font-semibold text-zinc-200">Timeline</span>
               <span className="hidden sm:inline">•</span>
@@ -232,27 +232,39 @@ export default function Editor({
               )}
             </div>
 
-            {/* Undo / Redo controls */}
-            <div className="flex items-center gap-1">
+            {/* Undo / Redo controls + Mobile Export */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleUndo}
+                  disabled={historyIndex <= 0}
+                  className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Undo (Ctrl+Z)"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={historyIndex >= history.length - 1}
+                  className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Redo (Ctrl+Y)"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" />
+                  </svg>
+                </button>
+              </div>
+
               <button
-                onClick={handleUndo}
-                disabled={historyIndex <= 0}
-                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent"
-                title="Undo (Ctrl+Z)"
+                onClick={onExport}
+                className="lg:hidden px-3.5 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-[11px] font-bold rounded-lg text-white flex items-center gap-1 hover:from-violet-500 hover:to-indigo-500 active:scale-95 transition-all shadow-md shadow-violet-600/10 shrink-0"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                 </svg>
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
-                className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:hover:bg-transparent"
-                title="Redo (Ctrl+Y)"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m15 15 6-6m0 0-6-6m6 6H9a6 6 0 0 0 0 12h3" />
-                </svg>
+                Export
               </button>
             </div>
           </div>
