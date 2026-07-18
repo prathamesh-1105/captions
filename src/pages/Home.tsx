@@ -25,16 +25,20 @@ export default function Home({ onStart }: HomeProps) {
         const response = await fetch(`${API_BASE}/api/projects`);
         const contentType = response.headers.get('content-type') || '';
         
-        if (response.ok && contentType.includes('application/json')) {
-          const data = await response.json();
+        let data: any = null;
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+        }
+
+        if (response.ok) {
           setRecentProjects(data || []);
         } else {
-          console.error('Failed to retrieve recent projects from backend: Non-JSON response.');
-          setError(`Connection error: Received HTML page instead of JSON data. Fetch URL was: ${API_BASE}/api/projects.`);
+          const errMsg = data?.error || `Server error (${response.status})`;
+          setError(`Backend Error: ${errMsg}`);
         }
       } catch (err: any) {
         console.error('Failed to connect to backend server:', err);
-        setError(`Failed to connect to rendering backend: ${err.message}. Fetch URL: ${API_BASE}/api/projects`);
+        setError(`Failed to connect to rendering backend: ${err.message}. Please make sure "npm run dev --prefix server" is running on your desktop.`);
       }
     }
     fetchInitialData();

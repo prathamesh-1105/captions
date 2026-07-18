@@ -191,6 +191,19 @@ const mapProjectFromDb = (p: any) => {
   };
 };
 
+function cleanSupabaseError(err: any): string {
+  const msg = err.message || '';
+  const details = err.details || '';
+  if (
+    msg.includes('ENOTFOUND') || 
+    msg.includes('fetch failed') ||
+    details.includes('aejxsfozuzrgnkewhpzf.supabase.co')
+  ) {
+    return 'Your Supabase database is offline or paused. Please log into the Supabase dashboard (https://supabase.com) and click "Resume Project" to unpause it.';
+  }
+  return msg || 'Failed to connect to database.';
+}
+
 app.get('/api/projects', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -206,7 +219,7 @@ app.get('/api/projects', async (req, res) => {
     res.json(mapped);
   } catch (err: any) {
     console.error('Failed to get projects:', err);
-    res.status(500).json({ error: err.message || 'Failed to fetch projects.' });
+    res.status(500).json({ error: cleanSupabaseError(err) });
   }
 });
 
@@ -262,7 +275,7 @@ app.post('/api/projects', async (req, res) => {
     }
   } catch (err: any) {
     console.error('Failed to save project:', err);
-    res.status(500).json({ error: err.message || 'Failed to save project.' });
+    res.status(500).json({ error: cleanSupabaseError(err) });
   }
 });
 
@@ -314,7 +327,7 @@ app.delete('/api/projects/:id', async (req, res) => {
     res.json({ success: true, message: 'Project and associated storage files deleted successfully.' });
   } catch (err: any) {
     console.error('Delete project failed:', err);
-    res.status(500).json({ error: err.message || 'Failed to delete project.' });
+    res.status(500).json({ error: cleanSupabaseError(err) });
   }
 });
 
