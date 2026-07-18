@@ -18,9 +18,20 @@ export default function Home({ onStart }: HomeProps) {
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
   const [serverInfo, setServerInfo] = useState<{ url: string } | null>(null);
+  const [needsConnection, setNeedsConnection] = useState<boolean>(false);
 
   // Fetch recent projects and server info from Backend on mount (bypasses RLS)
   useEffect(() => {
+    const isVercel = window.location.hostname.includes('vercel.app');
+    const hasSavedUrl = !!localStorage.getItem('backend_url');
+    
+    if (isVercel && !hasSavedUrl) {
+      setNeedsConnection(true);
+      return;
+    }
+    
+    setNeedsConnection(false);
+
     async function fetchInitialData() {
       try {
         const response = await fetch(`${API_BASE}/api/projects`);
@@ -43,7 +54,6 @@ export default function Home({ onStart }: HomeProps) {
         const response = await fetch(`${API_BASE}/api/info`);
         if (response.ok) {
           const data = await response.json();
-          const isVercel = window.location.hostname.includes('vercel.app');
           if (data && data.url && (!isVercel || window.location.hostname === 'localhost')) {
             setServerInfo(data);
           }
@@ -64,7 +74,7 @@ export default function Home({ onStart }: HomeProps) {
       setUploadProgress('Deleting project files...');
       
       const response = await fetch(`${API_BASE}/api/projects/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
 
       if (!response.ok) {
@@ -82,11 +92,15 @@ export default function Home({ onStart }: HomeProps) {
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (needsConnection) {
+      setError('Please connect to your desktop backend before uploading videos.');
+      return;
+    }
     if (acceptedFiles.length > 0) {
       setVideoFile(acceptedFiles[0]);
       setError('');
     }
-  }, []);
+  }, [needsConnection]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -116,6 +130,10 @@ export default function Home({ onStart }: HomeProps) {
   };
 
   const handleStart = async () => {
+    if (needsConnection) {
+      setError('Please connect to your desktop backend before starting video transcription.');
+      return;
+    }
     if (!videoFile) {
       setError('Please upload a video file first.');
       return;
@@ -318,7 +336,57 @@ export default function Home({ onStart }: HomeProps) {
           </div>
         )}
 
-        {error && (
+        {needsConnection && (
+          <div className="p-5 rounded-2xl bg-zinc-900/90 border border-violet-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-violet-600/10 text-violet-400 flex items-center justify-center shrink-0 mt-0.5">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                </svg>
+              </div>
+              <div className="space-y-1 text-left">
+                <p className="font-bold text-base text-zinc-100">🔌 Connect to Desktop Backend</p>
+                <p className="text-xs text-zinc-450 max-w-lg">
+                  To load your local video projects and edit captions, please connect this cloud page to your desktop rendering server.
+                </p>
+              </div>
+            </div>
+            
+            {/* LAN Custom Connection Input */}
+            <div className="flex flex-col gap-1.5 shrink-0 bg-black/45 p-3 rounded-xl border border-white/5 w-full md:w-auto">
+              <span className="text-[10px] text-zinc-400 font-semibold text-left">Connect to desktop backend IP:</span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="http://192.168.1.108:5001"
+                  className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1.5 text-base sm:text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 w-full sm:w-44"
+                  id="custom-backend-input"
+                  defaultValue={API_BASE}
+                />
+                <button
+                  onClick={() => {
+                    const val = (document.getElementById('custom-backend-input') as HTMLInputElement)?.value;
+                    if (val) {
+                      localStorage.setItem('backend_url', val.trim());
+                      window.location.reload();
+                    } else {
+                      localStorage.setItem('backend_url', 'http://192.168.1.108:5001');
+                      window.location.reload();
+                    }
+                  }}
+                  className="px-4 py-1.5 bg-violet-600 hover:bg-violet-500 rounded text-xs text-white font-semibold transition-colors shrink-0"
+                >
+                  Connect
+                </button>
+              </div>
+              <div className="text-[10px] text-zinc-500 text-left mt-0.5">
+                Your desktop IP: <code className="text-violet-400 font-mono font-bold select-all bg-black/40 px-1 py-0.5 rounded border border-white/5 ml-1">http://192.168.1.108:5001</code>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && !needsConnection && (
           <div className="p-4 rounded-lg bg-red-950/50 border border-red-500/30 text-red-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-start gap-2.5">
               <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -354,7 +422,7 @@ export default function Home({ onStart }: HomeProps) {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="http://192.168.1.109:5001"
+                    placeholder="http://192.168.1.108:5001"
                     className="bg-zinc-900 border border-white/10 rounded px-2.5 py-1 text-base sm:text-xs text-white placeholder-zinc-550 focus:outline-none focus:border-violet-500 w-full sm:w-44"
                     id="custom-backend-input"
                     defaultValue={API_BASE}
@@ -373,7 +441,7 @@ export default function Home({ onStart }: HomeProps) {
                   </button>
                 </div>
                 <div className="text-[10px] text-zinc-500 text-left mt-0.5">
-                  Your desktop IP: <code className="text-violet-400 font-mono font-bold select-all bg-black/40 px-1 py-0.5 rounded border border-white/5 ml-1">http://192.168.1.109:5001</code>
+                  Your desktop IP: <code className="text-violet-400 font-mono font-bold select-all bg-black/40 px-1 py-0.5 rounded border border-white/5 ml-1">http://192.168.1.108:5001</code>
                 </div>
               </div>
             )}
