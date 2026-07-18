@@ -163,9 +163,24 @@ export default function Editor({
 
   // Caption Operations
   const handleUpdateCaption = (id: string, updatedFields: Partial<CaptionBlock>) => {
+    const target = captions.find(c => c.id === id);
+    if (!target) return;
+
+    const isPosOrRotUpdate = 
+      updatedFields.x !== undefined || 
+      updatedFields.y !== undefined || 
+      updatedFields.rotation !== undefined;
+
     const newCaptions = captions.map(c => {
       if (c.id === id) {
         return { ...c, ...updatedFields };
+      }
+      if (isPosOrRotUpdate && c.start >= target.start) {
+        const updates: Partial<CaptionBlock> = {};
+        if (updatedFields.x !== undefined) updates.x = updatedFields.x;
+        if (updatedFields.y !== undefined) updates.y = updatedFields.y;
+        if (updatedFields.rotation !== undefined) updates.rotation = updatedFields.rotation;
+        return { ...c, ...updates };
       }
       return c;
     });
